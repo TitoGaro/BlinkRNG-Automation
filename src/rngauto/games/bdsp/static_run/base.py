@@ -102,6 +102,29 @@ class RunBase:
         self.d.controller.submit([Command(ControllerState(button), 80, label), Command(NEUTRAL, 80, label)])
         ctx.log("input", f"{button.name}: {label}")
 
+    def _report_frame_overruns(self, ctx: StateContext) -> None:
+        """Avisa si la capturadora tuvo que descartar frames porque el programa se retrasó al leerlos (CPU
+        ocupada, antivirus…): un parpadeo en ese tramo se pierde, y así queda constancia en el registro."""
+        source = self.d.frames
+        stats = getattr(source, "stats", None) or getattr(getattr(source, "frames", None), "stats", None)
+        overruns = getattr(stats, "overruns", 0)
+        seen = getattr(self, "_overruns_seen", 0)
+        if isinstance(overruns, int) and overruns > seen:
+            ctx.log("warning", t("Se han perdido {n} frames: el programa se retrasó al leer la imagen (¿el PC va "
+                                 "muy cargado?)", "{n} frames were lost: the program fell behind reading the video "
+                                 "(is the PC very busy?)", n=overruns - seen))
+            self._overruns_seen = overruns
+
+    def _send_final(self, ctx: StateContext, press) -> str:
+        """Pulsación final, la que genera el Pokémon. Desde aquí puede haber un shiny en pantalla, así que el
+        juego ya no se reinicia solo; y el intento ha llegado hasta el final (se ponen a cero los reinicios por
+        imprevistos)."""
+        self._battle_possible = True
+        self._press(ctx, Button[press.trigger.upper()], "final")
+        ctx.data["final_sent_t"] = press.send_t
+        self._auto_restarts = 0
+        return "ENCOUNTER"
+
     def _keep_awake(self, ctx: StateContext, next_press_t: float | None = None) -> None:
         """Toque de stick derecho cada ``keep_awake_s`` para que la Switch no atenúe ni suspenda la pantalla.
         Nunca en modo ensayo ni cerca de una pulsación planificada."""
@@ -124,6 +147,7 @@ class RunBase:
             self._next_warning_check = time.monotonic() + 2.0
             for warning in self.d.controller.take_warnings():
                 ctx.log("warning", warning)
+            self._report_frame_overruns(ctx)
         gap_started: float | None = None
         while True:
             frame = self.d.frames.read()

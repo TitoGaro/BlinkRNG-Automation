@@ -3,6 +3,7 @@ advance obtenido y calibrar). Si es shiny, se para sin tocar el mando."""
 from __future__ import annotations
 
 import datetime as dt
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -22,7 +23,8 @@ from ..blink_pipeline import BlinkRecovery
 from ..encounters import encounter_species, target_label
 from ..identify import Observation, candidate_advances
 from ..planner import Plan
-from ..shiny import BEFORE, ShinyEncounterWatcher
+from ..screens import battle_menu_visible, dialog_visible
+from ..shiny import BEFORE, ShinyEncounterWatcher, battle_dialog_visible
 from ..shiny_sound import detect as detect_sound
 from ..summary import read_summary_any
 from .config import Mode
@@ -145,6 +147,8 @@ class CaptureMixin:
             ctx.log("warning", t("Intento sin verificar: no se puede calibrar con él",
                                  "Unverified attempt: it cannot be used for calibration"))
             return "RESET"
+        if obs.shiny is None and obs.is_shiny is None and ctx.data.pop("seen_not_shiny", False):
+            obs = replace(obs, is_shiny=False)  # la ficha no dice si brilla; el combate (o el usuario) sí
         cands = candidate_advances(self.d.finder, rec.result.state, target.advance, obs, self.cfg.identify_radius)
         if not cands:
             # Encuentro nuevo con el delay inicial muy lejos del real: IVs + naturaleza son casi únicos, así que
@@ -184,8 +188,8 @@ class CaptureMixin:
             self.d.on_attempt(attempt)
         hit = self._is_success(obs, cands, rec)
         if hit is not True and any(self.d.finder.generate(rec.result.state, c).shiny is not Shiny.NONE for c in cands):
-            # La ficha no dice si es shiny, pero el advance sí: si lo obtenido puede ser un shiny (el detector del
-            # combate falló o el usuario contestó «no» por error), nunca se reinicia el juego: se para para guardar.
+            # Si lo obtenido puede ser un shiny (sin veredicto claro del combate), nunca se reinicia el juego: se
+            # para para guardar.
             raise InterventionRequired(t("Por el advance obtenido puede ser el SHINY: guarda la partida (no se reinicia)",
                                          "Judging by the advance obtained it may be the SHINY: save the game "
                                          "(no restart)"), recoverable=False)
@@ -232,10 +236,19 @@ class CaptureMixin:
             if watcher.feed(image, frame.t_s):
                 break
             if watcher.state == BEFORE and ctx.now() > start_deadline:
-                ctx.log("error", t("El combate no ha empezado tras la A final: se reinicia el juego",
-                                   "The battle did not start after the final A: restarting the game"))
                 self._save_clip(ctx, clip, watcher, sent, video=True)
-                return "RESET"
+                if self._no_battle_evidence(ctx):
+                    ctx.log("error", t("El combate no ha empezado tras la A final (sigue el texto del legendario): "
+                                       "se reinicia el juego",
+                                       "The battle did not start after the final A (the legendary's text is still "
+                                       "there): restarting the game"))
+                    return "RESET"
+                # Sin pruebas de que no haya combate (la imagen puede haber cambiado), nunca se reinicia.
+                raise InterventionRequired(t(
+                    "No reconozco el combate tras la A final y tampoco el texto del legendario: no se reinicia por si "
+                    "hay un combate (quizá shiny) en pantalla. Revisa la consola",
+                    "I recognise neither the battle after the final A nor the legendary's text: not restarting in "
+                    "case there is a battle (maybe shiny) on screen. Check the console"), recoverable=False)
             if watcher.state != BEFORE and end_deadline is None:
                 end_deadline = ctx.now() + 60.0
                 self._emit(message=t("Combate en marcha: mirando si es shiny…",
@@ -255,6 +268,19 @@ class CaptureMixin:
                 ctx.log("warning", t("No se pudo leer el sonido del combate: {exc}",
                                      "Could not read the battle audio: {exc}", exc=exc))
                 audio = None
+            else:
+                if audio is None or len(audio) == 0:  # el flujo de audio se cortó (p. ej. la capturadora por USB)
+                    ctx.log("warning", t("No llega sonido de la capturadora: el shiny se decide solo con la imagen",
+                                         "No audio from the capture card: the shiny is judged from the picture only"))
+                    audio = None
+                elif self.d.shiny_sound is not None and self.d.shiny_sound.rate != rate:
+                    ctx.log("warning", t("El sonido llega a otra frecuencia ({rate} Hz) que el sonido shiny aprendido: "
+                                         "no se usa", "The audio arrives at a different rate ({rate} Hz) from the "
+                                         "learned shiny sound: not used", rate=rate))
+        elif not getattr(self, "_warned_no_audio", False):  # una vez por ejecución
+            self._warned_no_audio = True
+            ctx.log("warning", t("Sin sonido de la capturadora: el shiny se decide solo con la imagen",
+                                 "No audio from the capture card: the shiny is judged from the picture only"))
         if audio is not None and self.d.shiny_sound is not None:
             match = detect_sound(audio, rate, self.d.shiny_sound)
             watcher.add_sound(match.detected, match.best_error)
@@ -267,6 +293,9 @@ class CaptureMixin:
         folder = self._save_clip(ctx, clip, watcher, sent, audio=audio, rate=rate, audio_t0=audio_t0,
                                  video=suspicious)
         if not verdict.is_shiny:
+            # Sin nada sospechoso, el combate cuenta como «no shiny» en VERIFY: los advances vecinos dan la misma
+            # ficha y solo cambia el brillo, así que sin este veredicto un fallo por uno parecería un posible shiny.
+            ctx.data["seen_not_shiny"] = not suspicious
             return "CATCH"
         if (self.d.shiny_sound is None and audio is not None and rate and audio_t0 is not None
                 and verdict.sparkle_t is not None and self.d.shiny_sound_path is not None and self.d.clips_dir):
@@ -288,6 +317,18 @@ class CaptureMixin:
                            name=name, where=where))
         self._emit(phase="SHINY", message=t("¡SHINY! {name}", "SHINY! {name}", name=name))
         return None
+
+    def _no_battle_evidence(self, ctx: StateContext) -> bool:
+        """¿Hay pruebas de que el combate no empezó? El cuadro de texto del mundo abierto (el del legendario)
+        sigue en pantalla y no se ve nada de combate durante ~1 s."""
+        streak, end = 0, ctx.now() + 3.0
+        while ctx.now() < end:
+            image = self._next_frame(ctx).image
+            quiet = (dialog_visible(image) and not battle_dialog_visible(image) and not battle_menu_visible(image))
+            streak = streak + 1 if quiet else 0
+            if streak >= 20:
+                return True
+        return False
 
     def _record_shiny(self, ctx: StateContext) -> None:
         """Un shiny también calibra: si solo el objetivo (y no sus vecinos) es shiny, se acertó el advance."""
@@ -363,6 +404,7 @@ class CaptureMixin:
                                           "(save the game if you have not already). No: it goes to its Summary to "
                                           "calibrate and continues.", name=name))
         ctx.check()
+        ctx.data["seen_not_shiny"] = shiny is False  # «No» explícito: vale como veredicto en VERIFY
         if shiny is not False:
             if shiny:
                 self._record_shiny(ctx)

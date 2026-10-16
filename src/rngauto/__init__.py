@@ -1,7 +1,7 @@
 """rngauto: automatización de RNG (BDSP Blink RNG). Autor: TitoGaro."""
 import os
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 __author__ = "TitoGaro"
 
 # Debe fijarse ANTES de que cualquier módulo importe cv2: con las transformaciones por hardware de Media

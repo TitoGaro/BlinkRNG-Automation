@@ -102,7 +102,8 @@ comprueba con la imagen; ante algo inesperado se pide intervención en vez de se
         raise InterventionRequired(t("Tras reiniciar el juego no vuelvo a ver la escena del ojo (¿se guardó la partida "
                                      "en el punto de inicio, mirando a la cámara?)",
                                      "After restarting the game, the eye scene does not come back (was the game "
-                                     "saved at the starting point, facing the camera?)"))
+                                     "saved at the starting point, facing the camera?)"),
+                                   recoverable=False)  # reiniciar otra vez no arregla un punto de guardado mal
 
     def reset(self, ctx: StateContext) -> str:
         """RESET: reinicia el juego para otro intento (desde HOME, con la función de ``deps`` o pidiéndolo al
@@ -113,6 +114,7 @@ comprueba con la imagen; ante algo inesperado se pide intervención en vez de se
                                          n=self.cfg.max_attempts), recoverable=False)
         ctx.log("state", t("Reintento {n}: reiniciando el juego", "Retry {n}: restarting the game", n=self.attempt_no))
         self._battle_possible = False
+        ctx.data.pop("seen_not_shiny", None)  # el veredicto del combate es de cada intento
         if not self._fast_declined:  # un fallo de la Pokédex en el intento anterior no la descarta para siempre
             self._fast_disabled -= {i for i, n in self._fast_failures.items() if n < FAST_FAIL_MAX}
         self._emit(phase="RESET", attempt=self.attempt_no + 1,

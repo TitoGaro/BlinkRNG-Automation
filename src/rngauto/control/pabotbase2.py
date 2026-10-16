@@ -317,7 +317,13 @@ class RscEndpoint:
         de la ventana (cancelación de emergencia: mejor un paquete de más que botones pulsados)."""
         chunk = max(1, self.max_packet - OVERHEAD)
         seq = -1
-        with self._stream_lock:
+        # Otro hilo puede tener el candado esperando hueco en la ventana (hasta su propio plazo): se espera como
+        # mucho ``timeout_s``. Una cancelación de emergencia sale igualmente: los mensajes caben en un paquete y
+        # el desplazamiento del stream se asigna bajo ``_lock``, así que no se mezclan.
+        acquired = self._stream_lock.acquire(timeout=timeout_s)
+        if not acquired and not force:
+            raise TimeoutError(t("El enlace con el dispositivo está ocupado", "The link to the device is busy"))
+        try:
             for i in range(0, len(data), chunk):
                 part = data[i:i + chunk]
                 deadline = time.monotonic() + timeout_s
@@ -338,6 +344,9 @@ class RscEndpoint:
                     raw = encode_packet(seq, ASK_STREAM_DATA, payload, self.session)
                     self._pending[seq] = _Pending(raw, seq, ASK_STREAM_DATA, payload, time.monotonic())
                 self._send_raw(raw)
+        finally:
+            if acquired:
+                self._stream_lock.release()
         return seq
 
     def alive(self) -> bool:

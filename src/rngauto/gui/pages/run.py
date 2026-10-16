@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import shutil
 import threading
 import time
 
@@ -282,6 +283,8 @@ class RunPage(Page):
             run = build_static_run(session, req, self.operator, timeline, self.bridge.status.emit, session_dir)
         except Exception as exc:
             self._sink.close()
+            # Sin ejecución no queda nada que guardar: una carpeta vacía confundiría al historial y al informe.
+            shutil.rmtree(session_dir, ignore_errors=True)
             QMessageBox.warning(self, t("No se puede empezar", "Cannot start"), str(exc))
             return
         self.machine = run.build()

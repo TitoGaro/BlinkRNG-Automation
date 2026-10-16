@@ -39,6 +39,7 @@ def test_regigigas_needs_both_eyes(app, tmp_path):
     assert page.eye_choice.currentData() == "regigigas_delante"  # se ofrece primero el que falta
     assert not st.eye_ready and "delante del legendario" in page.missing()
     save_eye_setup(tmp_path, "regigigas_delante", eye(), NormBox(0.45, 0.45, 0.1, 0.1), 1080)
+    st.forget_eye_cache()  # guardado directo (la página lo hace al pulsar «Guardar este ojo»)
     assert st.eye_ready and page.is_complete()
     assert load_eye_setup(tmp_path, "regigigas_delante") is not None
 

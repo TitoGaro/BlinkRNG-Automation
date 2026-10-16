@@ -42,7 +42,9 @@ def last_session(data_dir: Path) -> Path | None:
     sessions = data_dir / "sessions"
     if not sessions.is_dir():
         return None
-    folders = sorted((p for p in sessions.iterdir() if (p / "timeline.jsonl").is_file()), key=lambda p: p.name)
+    folders = sorted((p for p in sessions.iterdir()
+                      if (p / "timeline.jsonl").is_file() and (p / "timeline.jsonl").stat().st_size > 0),
+                     key=lambda p: p.name)
     return folders[-1] if folders else None
 
 
@@ -51,7 +53,7 @@ def timeline_tail(path: Path, lines: int = TIMELINE_LINES) -> list[str]:
     («aún sin solución con N parpadeos»), que no aportan nada y ocupan mucho."""
     out: list[str] = []
     try:
-        raw = path.read_text(encoding="utf-8").splitlines()
+        raw = path.read_text(encoding="utf-8", errors="replace").splitlines()  # cortado a medias: no falla
     except OSError:
         return out
     last_shape, repeats = None, 0
@@ -119,15 +121,24 @@ def issue_url(report: str, encounter: str = "", setup: str = "") -> tuple[str, b
     """Dirección del formulario de fallo de GitHub con los campos rellenados. Si el informe no cabe entero en la
     dirección, se conserva el entorno y se recorta lo más antiguo del resto, y devuelve ``(url, False)``: en ese
     caso hay que pegar el informe completo a mano."""
-    base = {"template": "bug_report.yml", "version": __version__, "encounter": encounter, "setup": setup}
+    base = {"template": "bug_report.yml", "version": __version__, "encounter": anonymize(encounter),
+            "setup": anonymize(setup)}
+
+    def url_for(text: str) -> str:
+        return f"{ISSUES_URL}?{urlencode({**base, 'diagnostic': text})}"
+
     head, sep, rest = report.partition("\n\n### ")
     rest = sep.lstrip("\n") + rest
     complete = True
-    while True:
+    for _ in range(60):  # cada vuelta quita algo: siempre termina
         text = head + ("\n\n" + rest if rest else "")
-        url = f"{ISSUES_URL}?{urlencode({**base, 'diagnostic': text})}"
-        if len(url) <= MAX_URL_CHARS or not rest:
-            return url, complete
+        if len(url_for(text)) <= MAX_URL_CHARS:
+            return url_for(text), complete
         complete = False
-        cut = rest[len(rest) // 5:].split("\n", 1)
-        rest = "(…)\n" + cut[-1] if len(cut) > 1 else ""  # quita el 20 % más antiguo, por líneas
+        if rest:  # se quita el 20 % más antiguo del resto, por líneas
+            lines = [line for line in rest.split("\n") if line != "(…)"]
+            lines = lines[max(1, len(lines) // 5):]
+            rest = "(…)\n" + "\n".join(lines) if lines else ""
+        else:  # cabecera enorme (p. ej. texto añadido a mano al principio): se recorta también
+            head = head[:len(head) * 4 // 5]
+    return url_for(""), False

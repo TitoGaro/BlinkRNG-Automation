@@ -63,7 +63,7 @@ def test_too_few_blinks_is_ambiguous_or_refused():
 def test_plan_in_scene_hits_the_target():
     """El plan sobre la escena predicha lleva al objetivo en una simulación completa (espera + timeline)."""
     from rngauto.core.encounter import FinalAction, SceneSpec, TimelinePhase
-    from rngauto.games.bdsp.planner import plan_static_in_scene, simulate_phase  # noqa: F401
+    from rngauto.games.bdsp.planner import plan_static_in_scene
     from rngauto.games.bdsp.xorshift import Xorshift128
 
     base, sim, events = scene(2, 900)

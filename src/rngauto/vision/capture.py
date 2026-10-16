@@ -10,6 +10,7 @@ import os
 
 os.environ.setdefault("OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS", "0")
 
+import logging  # noqa: E402
 import threading  # noqa: E402
 import time  # noqa: E402
 from collections import deque  # noqa: E402
@@ -22,6 +23,8 @@ import numpy as np  # noqa: E402
 from rngauto import i18n  # noqa: E402  (``i18n.t``: aquí ``t`` es el instante de un frame)
 
 from .frames import Frame, SourceInfo  # noqa: E402
+
+log = logging.getLogger(__name__)
 
 BACKENDS = {"msmf": cv2.CAP_MSMF, "dshow": cv2.CAP_DSHOW, "any": cv2.CAP_ANY}
 
@@ -39,6 +42,7 @@ class CaptureStats:
     frames: int = 0
     duplicates: int = 0  # frames idénticos al anterior (la capturadora repite)
     gaps: int = 0  # saltos > 1,5 periodos (frames perdidos)
+    overruns: int = 0  # frames descartados porque el consumidor se retrasó y el búfer estaba lleno
     started_at: float = 0.0
     last_frame_at: float = 0.0
     intervals: deque = field(default_factory=lambda: deque(maxlen=600))  # últimos ~10 s a 60 fps
@@ -161,6 +165,10 @@ class CaptureDevice:
         """Cuerpo del hilo: captura hasta que se pide cerrar y libera el dispositivo desde este mismo hilo."""
         try:
             self._capture_frames()
+        except Exception as exc:  # que el motivo real llegue al usuario, no un genérico «sin imagen»
+            self.error = f"{type(exc).__name__}: {exc}"
+            self._running.clear()
+            log.exception("El hilo de la capturadora se ha detenido")
         finally:
             cap, self._cap = self._cap, None
             if cap is not None:
@@ -196,6 +204,8 @@ class CaptureDevice:
             frame = Frame(image, t, index)
             index += 1
             with self._cond:
+                if len(self._buffer) == self._buffer.maxlen:  # el más antiguo se pierde: queda contado
+                    st.overruns += 1
                 self._buffer.append(frame)
                 self._latest = frame
                 self._cond.notify_all()

@@ -98,7 +98,7 @@ class HistoryPage(Page):
         lines = []
         for path in sorted(cal_dir.glob("*.json")) if cal_dir.exists() else []:
             try:
-                hist = CalibrationHistory.from_dict(json.loads(path.read_text(encoding="utf-8")))
+                hist = CalibrationHistory.from_dict(json.loads(path.read_text(encoding="utf-8", errors="replace")))
                 summary = hist.estimate_final_delay().describe()
             except (OSError, ValueError, KeyError, TypeError, AttributeError):  # dañado: no impide ver el resto
                 continue
@@ -112,7 +112,7 @@ class HistoryPage(Page):
         # Las carpetas de sesión empiezan por fecha y hora: el orden inverso de nombre es el más reciente primero.
         for path in sorted(sessions.glob("*/attempts.jsonl"), reverse=True) if sessions.exists() else []:
             try:
-                lines_in_file = path.read_text(encoding="utf-8").splitlines()
+                lines_in_file = path.read_text(encoding="utf-8", errors="replace").splitlines()  # tras un corte
             except OSError:
                 continue
             for line in reversed(lines_in_file):  # lo más reciente primero

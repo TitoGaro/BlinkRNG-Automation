@@ -10,6 +10,7 @@ Estructura: ``PABotBase2Client`` habla el protocolo (peticiones, cola de comando
 """
 from __future__ import annotations
 
+import logging
 import random
 import struct
 import threading
@@ -31,6 +32,8 @@ from .pabotbase2 import (
     encode_message,
 )
 from .transport import Transport
+
+log = logging.getLogger(__name__)
 
 STALL_MARGIN_S = 5.0  # retraso máximo de la cola sobre lo previsto antes de dar el mando por perdido
 
@@ -112,6 +115,7 @@ class PABotBase2Client:
         self._req_id = 0
         self._cmd_id = 0
         self._outstanding: dict[int, float] = {}  # id de comando → instante de envío
+        self._cancel_gen = 0  # sube con cada cancelación: un envío que esperaba hueco no debe salir después
         self._expected_done = 0.0  # instante (monótono) en que debería terminar todo lo encolado
         self.queue_limit = 4
         self.console_disconnects: list[int] = []
@@ -253,19 +257,27 @@ class PABotBase2Client:
         y detección de cola atascada) para no provocar descartes."""
         deadline = time.monotonic() + timeout_s
         with self._cond:
+            generation = self._cancel_gen
             while len(self._outstanding) >= self.queue_limit:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0 or self._stalled():
                     raise ControllerError(t("El mando no responde: la cola de pulsaciones no avanza",
                                             "The controller is not responding: the input queue is not moving"))
                 self._cond.wait(min(remaining, 0.25))
+                if self._cancel_gen != generation:  # una PARADA vació la cola mientras se esperaba: no se envía
+                    raise ControllerNotReady(t("Comando cancelado por la PARADA", "Command cancelled by STOP"))
             self._cmd_id = (self._cmd_id + 1) & 0xFF
             cmd_id = self._cmd_id
             now = time.monotonic()
             self._outstanding[cmd_id] = now
             # Si la cola estaba vacía, el comando empieza ahora; si no, a continuación de lo encolado.
             self._expected_done = max(self._expected_done, now) + command.duration_ms / 1000
-        self.rsc.send_stream(encode_command(cmd_id, command))
+        try:
+            self.rsc.send_stream(encode_command(cmd_id, command))
+        except BaseException:  # no ha salido: no debe contar como pendiente (si no, la cola parece atascada)
+            with self._cond:
+                self._outstanding.pop(cmd_id, None)
+            raise
         return cmd_id
 
     def wait_all(self, timeout_s: float | None = None) -> None:
@@ -289,6 +301,7 @@ class PABotBase2Client:
         tope) a que el dispositivo lo confirme; devuelve si consta como recibido."""
         with self._cond:
             self._outstanding.clear()
+            self._cancel_gen += 1
             self._cond.notify_all()
         seq = self.send_message(MSG_CQ_CANCEL, timeout_s=0.3, force=True)
         return wait_ack_s <= 0 or seq < 0 or self.rsc.wait_acked(seq, wait_ack_s)
@@ -452,6 +465,14 @@ class ESP32Controller(Controller):
                 self.client.send_command(cmd)
             except (TimeoutError, OSError) as exc:
                 raise self._link_error(exc) from exc
+            if self._halted.is_set():
+                # La PARADA llegó mientras se enviaba: otra cancelación desde este mismo hilo llega seguro
+                # después de ese comando, así que tampoco se ejecuta.
+                try:
+                    self.client.cancel()
+                except Exception:
+                    log.warning("No se pudo repetir la cancelación tras la PARADA", exc_info=True)
+                raise ControllerNotReady(t("Mando detenido", "Controller stopped"))
 
     def wait_idle(self, timeout_s: float | None = None) -> None:
         try:
@@ -486,11 +507,13 @@ class ESP32Controller(Controller):
         """No bloquea: si el enlace está caído, la interfaz no debe congelarse esperando. Hasta ``resume`` (al
         empezar otra ejecución o una pulsación manual) no se envía nada más."""
         self._halted.set()
+
         def cancel() -> None:
             try:
-                self.client.cancel()
-            except Exception:
-                pass
+                if not self.client.cancel(wait_ack_s=0.5):
+                    log.warning("El ESP32 no ha confirmado la PARADA (CQ_CANCEL sin acuse)")
+            except Exception:  # enlace caído: queda en el registro para poder diagnosticarlo
+                log.warning("No se pudo enviar la PARADA al ESP32", exc_info=True)
 
         threading.Thread(target=cancel, name="esp32-cancel", daemon=True).start()
 
@@ -500,7 +523,9 @@ class ESP32Controller(Controller):
         was_running = self._running.is_set()
         self._running.clear()
         try:
-            if was_running and self.client.link_problem() is None:
+            # Si el dispositivo lleva segundos sin contestar, esperar su acuse solo congelaría al que cierra.
+            answering = time.monotonic() - self.client.rsc.last_rx < 3.0
+            if was_running and self.client.link_problem() is None and answering:
                 try:
                     self.client.cancel(wait_ack_s=0.6)
                 except Exception:

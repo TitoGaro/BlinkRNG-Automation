@@ -54,7 +54,7 @@ def test_a_failed_pokedex_action_is_retried_after_a_restart():
     run._emit = lambda **_k: None
     run.attempt_no, run._battle_possible = 0, False
     run._fast_disabled, run._fast_failures, run._fast_declined = set(), {}, False
-    ctx = SimpleNamespace(log=lambda *_a, **_k: None, check=lambda: None)
+    ctx = SimpleNamespace(data={}, log=lambda *_a, **_k: None, check=lambda: None)
 
     for n in range(1, FAST_FAIL_MAX + 1):
         run._fast_failed("pokedex")

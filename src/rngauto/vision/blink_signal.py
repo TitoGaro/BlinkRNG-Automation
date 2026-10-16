@@ -351,6 +351,14 @@ class BlinkEventStream:
             return []
         return group_blinks(extract_blinks(self.samples, th), th)
 
+    def final_events(self) -> list[BlinkEvent]:
+        """Como ``all_events``, pero solo los eventos ya definitivos: el último parpadeo puede estar a medias
+        (un doble del que aún no ha llegado el segundo cierre parecería simple). Mismo criterio que ``poll``."""
+        if not self.samples:
+            return []
+        horizon = self.samples[-1].t_s - DOUBLE_BLINK_WINDOW_S - 0.15
+        return [e for e in self.all_events() if e.t_s <= horizon]
+
     def preview_count(self) -> int:
         """Parpadeos vistos hasta ahora, también antes de tener el umbral definitivo (con uno provisional,
         para que el usuario vea que avanza: el definitivo necesita unos minutos de datos)."""

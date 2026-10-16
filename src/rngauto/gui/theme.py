@@ -7,8 +7,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import QDir
+
 # Los ``url()`` del QSS necesitan barras normales también en Windows.
 _ASSETS = (Path(__file__).with_name("assets")).as_posix()
+# El QSS se refiere a los iconos por un prefijo y no por la ruta: una ruta con apóstrofo (p. ej.
+# C:/Users/O'Brien/…) haría que Qt descartase la hoja de estilos entera.
+QDir.addSearchPath("rngauto", _ASSETS)
 
 BG = "#0e1014"          # fondo de la ventana
 SURFACE = "#15171c"     # barras y tarjetas
@@ -87,7 +92,7 @@ QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit {{ background: {SURFACE_2}; borde
 QComboBox:hover, QSpinBox:hover, QDoubleSpinBox:hover, QLineEdit:hover {{ border-color: #3f4553; }}
 QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QLineEdit:focus {{ border-color: {ACCENT}; }}
 QComboBox::drop-down {{ border: none; width: 24px; }}
-QComboBox::down-arrow {{ image: url({_ASSETS}/chevron_down.svg); width: 12px; height: 12px; }}
+QComboBox::down-arrow {{ image: url(rngauto:chevron_down.svg); width: 12px; height: 12px; }}
 QSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0; border: none; }}
 QComboBox QAbstractItemView {{ background: {SURFACE_2}; border: 1px solid {BORDER_STRONG}; padding: 4px;
     selection-background-color: {SURFACE_3}; selection-color: {TEXT}; outline: none; }}
@@ -108,11 +113,11 @@ QProgressBar#slim {{ height: 4px; max-height: 4px; border-radius: 2px; }}
 QCheckBox, QRadioButton {{ spacing: 8px; }}
 QCheckBox::indicator {{ width: 15px; height: 15px; border-radius: 3px; border: 1px solid #4a505d;
     background: {SURFACE_2}; }}
-QCheckBox::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; image: url({_ASSETS}/check.svg); }}
+QCheckBox::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; image: url(rngauto:check.svg); }}
 QCheckBox::indicator:hover, QRadioButton::indicator:hover {{ border-color: {ACCENT}; }}
 QRadioButton::indicator {{ width: 16px; height: 16px; border-radius: 8px; border: 1px solid #4a505d;
     background: {SURFACE_2}; }}
-QRadioButton::indicator:checked {{ border: none; image: url({_ASSETS}/radio_dot.svg); }}
+QRadioButton::indicator:checked {{ border: none; image: url(rngauto:radio_dot.svg); }}
 
 QToolButton {{ background: {SURFACE_2}; border: 1px solid {BORDER_STRONG}; border-radius: 6px; padding: 5px 10px; }}
 QToolButton:hover {{ background: {SURFACE_3}; }}

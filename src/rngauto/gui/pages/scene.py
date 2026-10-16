@@ -127,6 +127,7 @@ class ScenePage(Page):
 
         Con ``keep_choice`` no se reconstruye el desplegable de ojos (se llama al cambiar de ojo).
         """
+        self.state.forget_eye_cache()  # el ojo pudo marcarse en otra visita: mirar los ficheros
         enc = self.state.selection.encounter
         self.prep_card.setVisible(self._needs_item())
         if not keep_choice:
@@ -262,6 +263,7 @@ class ScenePage(Page):
         try:
             save_eye_setup(self.state.data_dir, self._eye_id(), img[y:y + h, x:x + w].copy(), self._roi.expanded(2.5),
                            img.shape[0])
+            self.state.forget_eye_cache()
         except OSError as exc:  # disco lleno, carpeta sin permisos…: se dice aquí y se puede reintentar
             self.status.setText(f'<span style="color:{theme.DANGER}">'
                                 + t("No se pudo guardar el ojo: {error}", "Could not save the eye: {error}", error=exc)

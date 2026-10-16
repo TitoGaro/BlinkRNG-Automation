@@ -14,6 +14,7 @@ Las acciones son datos (``data/fast_advance.toml``): pulsaciones y esperas, sin 
 from __future__ import annotations
 
 import json
+import logging
 import math
 import statistics
 import tomllib
@@ -29,6 +30,8 @@ from .blink import RollAssignment, assign_rolls
 from .blink_pipeline import BlinkRecovery, EventLike
 from .recovery import AmbiguousPattern, BlinkObservation, RecoveryError, RecoveryResult, reidentify, reidentify_kinds
 from .xorshift import Xorshift128, XorshiftState
+
+log = logging.getLogger(__name__)
 
 DATA_FILE = Path(__file__).with_name("data") / "fast_advance.toml"
 REIDENTIFY_MAX_BLINKS = 20  # si con tantos parpadeos no se reidentifica, se recupera el estado desde cero
@@ -250,8 +253,15 @@ class AdvanceStats:
             for k, v in data.get("samples", {}).items():
                 samples[k] = [(float(x[0]), int(x[1])) if isinstance(x, list) else (0.0, int(x)) for x in v][-50:]
             reid = [float(x) for x in data.get("reidentify_s", [])][-50:]
-        except (OSError, ValueError, AttributeError, TypeError, IndexError):
+        except FileNotFoundError:
             samples, reid = {}, []
+        except (OSError, ValueError, AttributeError, TypeError, IndexError):
+            # Dañado: se aparta (para poder revisarlo) en vez de sobrescribirlo con lo que se aprenda ahora.
+            samples, reid = {}, []
+            try:
+                path.replace(path.with_suffix(path.suffix + ".bad"))
+            except OSError:
+                pass
         return cls(samples, path, reid)
 
     def save(self) -> None:
@@ -261,10 +271,12 @@ class AdvanceStats:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             data = {k: [[h, c] for h, c in v] for k, v in self.samples.items()}
-            self.path.write_text(json.dumps({"samples": data, "reidentify_s": self.reidentify_s}, indent=1),
-                                 encoding="utf-8")
+            tmp = self.path.with_suffix(self.path.suffix + ".tmp")  # escritura atómica: un corte no lo deja a medias
+            tmp.write_text(json.dumps({"samples": data, "reidentify_s": self.reidentify_s}, indent=1),
+                           encoding="utf-8")
+            tmp.replace(self.path)
         except OSError:
-            pass
+            log.warning("No se pudo guardar lo aprendido del avance rápido", exc_info=True)
 
     def add_reidentify(self, seconds: float) -> None:
         self.reidentify_s = (self.reidentify_s + [round(float(seconds), 1)])[-50:]

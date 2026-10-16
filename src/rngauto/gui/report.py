@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget
 
@@ -71,10 +71,12 @@ class ReportDialog(QDialog):
         lay.addWidget(label(t(
             "Este informe ayuda a encontrar el fallo: versión, sistema, hardware y los últimos eventos y errores. "
             "Revísalo y quita lo que no quieras compartir: no incluye tu nombre de usuario ni tus carpetas. "
-            "Al pulsar «Abrir en GitHub» se abre el formulario en el navegador; nada se envía hasta que lo publiques.",
+            "«Abrir en GitHub» lo envía a GitHub dentro del enlace para rellenar el formulario en tu navegador; "
+            "no se publica hasta que tú envíes el formulario.",
             "This report helps find the problem: version, system, hardware and the latest events and errors. Review "
             "it and remove anything you do not want to share: it does not include your user name or your folders. "
-            "\"Open on GitHub\" opens the form in your browser; nothing is sent until you submit it."), "muted"))
+            "\"Open on GitHub\" sends it to GitHub inside the link to fill in the form in your browser; it is not "
+            "published until you submit the form."), "muted"))
         self.text = QPlainTextEdit(build_report(self._data_dir, context))
         self.text.setStyleSheet(f"font-family: Consolas, monospace; font-size: 9pt; background: {theme.SURFACE_2};")
         lay.addWidget(self.text, 1)
@@ -118,11 +120,32 @@ class ReportDialog(QDialog):
         QDesktopServices.openUrl(QUrl(url))
 
 
-def offer_report(parent: QWidget | None, title: str, message: str, critical: bool = False) -> None:
-    """Aviso de error con un botón para informar del problema."""
+_OPEN: list[QWidget] = []  # avisos no modales abiertos (sin referencia, Python los destruiría al momento)
+
+
+def offer_report(parent: QWidget | None, title: str, message: str, critical: bool = False,
+                 modal: bool = True) -> None:
+    """Aviso de error con un botón para informar del problema. ``modal=False`` no bloquea la aplicación: para
+    errores que pueden llegar con una ejecución en marcha (el botón Detener y F12 deben seguir funcionando)."""
     box = QMessageBox(QMessageBox.Icon.Critical if critical else QMessageBox.Icon.Warning, title, message,
                       QMessageBox.StandardButton.Ok, parent)
     report = box.addButton(t("Informar del problema", "Report the problem"), QMessageBox.ButtonRole.ActionRole)
-    box.exec()
-    if box.clickedButton() is report:
-        ReportDialog(parent).exec()
+    if modal:
+        box.exec()
+        if box.clickedButton() is report:
+            ReportDialog(parent).exec()
+        return
+    box.setWindowModality(Qt.WindowModality.NonModal)
+
+    def clicked(button) -> None:
+        _OPEN.remove(box)
+        if button is report:
+            dialog = ReportDialog(parent)
+            dialog.setWindowModality(Qt.WindowModality.NonModal)
+            dialog.finished.connect(lambda _code: _OPEN.remove(dialog))
+            _OPEN.append(dialog)
+            dialog.show()
+
+    box.buttonClicked.connect(clicked)
+    _OPEN.append(box)
+    box.show()

@@ -7,10 +7,11 @@ Las preferencias se guardan en disco en cuanto cambian.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QTimer, Signal
 
 from rngauto import i18n
 from rngauto.i18n import t
@@ -52,6 +53,13 @@ class AppState(QObject):
         self.data_dir = data_dir
         self.assets_dir = ASSETS_DIR
         self.prefs = Preferences.load(data_dir)
+        # Guardar con un pequeño retardo: arrastrar el volumen haría cientos de escrituras en el hilo de la
+        # interfaz. ``close`` guarda lo pendiente al salir.
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.setInterval(400)
+        self._save_timer.timeout.connect(self.save_prefs_now)
+        self._eye_cache: tuple[float, str, bool] | None = None  # (instante, encuentro, resultado)
         i18n.set_language(str(self.prefs.extra.get("language") or i18n.system_language()))
         self.encounters = load_encounters(ENCOUNTERS_DIR)
         self.selection = Selection()
@@ -189,6 +197,10 @@ class AppState(QObject):
         self.changed.emit()
 
     def save_prefs(self) -> None:
+        """Programa el guardado de las preferencias (se agrupan los cambios seguidos)."""
+        self._save_timer.start()
+
+    def save_prefs_now(self) -> None:
         """Guarda las preferencias; un fallo de disco se registra pero no interrumpe la aplicación."""
         try:
             self.prefs.save(self.data_dir)
@@ -229,6 +241,19 @@ class AppState(QObject):
             return False
         if self.session is not None and self.session.demo:  # la escena simulada trae su propio ojo
             return True
+        # La interfaz lo consulta en cada refresco: se recuerda 2 s para no releer los ficheros cada vez.
+        now = time.monotonic()
+        if self._eye_cache is not None and self._eye_cache[1] == enc.id and now - self._eye_cache[0] < 2.0:
+            return self._eye_cache[2]
+        ready = self._eye_ready(enc)
+        self._eye_cache = (now, enc.id, ready)
+        return ready
+
+    def forget_eye_cache(self) -> None:
+        """Tras marcar un ojo: la próxima consulta vuelve a mirar los ficheros."""
+        self._eye_cache = None
+
+    def _eye_ready(self, enc: EncounterConfiguration) -> bool:
         if any(load_eye_setup(self.data_dir, eye) is None for eye in enc.extra_eyes):
             return False  # el ojo de delante del legendario no tiene plantilla por defecto: hay que marcarlo
         if load_eye_setup(self.data_dir, enc.id) is not None:
@@ -248,6 +273,7 @@ class AppState(QObject):
     def close(self) -> None:
         """Guarda y suelta todo; cada paso va por separado: que falle uno no deja el mando o la capturadora
         abiertos."""
+        self._save_timer.stop()  # se guarda ya lo pendiente
         steps = [lambda: self.prefs.save(self.data_dir), self.stop_audio]
         if self.session is not None:
             session = self.session

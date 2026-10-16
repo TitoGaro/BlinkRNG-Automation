@@ -108,11 +108,22 @@ class Preferences:
         if not path.exists():
             return cls()
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            # Se ignoran claves desconocidas (de versiones anteriores o posteriores).
-            return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
-        except (OSError, ValueError, TypeError, AttributeError):  # dañado o de otra versión: valores por defecto
+            data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        except (OSError, ValueError):  # dañado: valores por defecto
             return cls()
+        if not isinstance(data, dict):
+            return cls()
+        defaults = cls()
+        values = {}
+        # Se ignoran las claves desconocidas (de otras versiones) y los valores de otro tipo que el esperado
+        # (p. ej. «extra»: null, o un número escrito como texto): cada uno vuelve a su valor por defecto.
+        for key in cls.__dataclass_fields__:
+            value, default = data.get(key), getattr(defaults, key)
+            if isinstance(default, float) and isinstance(value, int) and not isinstance(value, bool):
+                value = float(value)
+            if value is not None and type(value) is type(default):
+                values[key] = value
+        return cls(**values)
 
     def save(self, data_dir: Path) -> None:
         data_dir.mkdir(parents=True, exist_ok=True)

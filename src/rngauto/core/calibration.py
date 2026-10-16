@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 from collections import deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -73,7 +73,8 @@ class AttemptRecord:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AttemptRecord":
-        return cls(**data)
+        known = {f.name for f in fields(cls)}  # un campo de una versión más nueva no invalida el historial
+        return cls(**{k: v for k, v in data.items() if k in known})
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,7 +261,10 @@ class CalibrationHistory:
             history = cls.from_dict(json.loads(path.read_text(encoding="utf-8")))
         except (ValueError, KeyError, TypeError, AttributeError):
             # Dañado (p. ej. disco lleno al guardar): se aparta para poder revisarlo y se empieza de cero.
-            path.replace(path.with_suffix(path.suffix + ".bad"))
+            try:
+                path.replace(path.with_suffix(path.suffix + ".bad"))
+            except OSError:  # bloqueado (antivirus, OneDrive…): se ignora y se empieza de cero igualmente
+                pass
             return cls(encounter, prior_final_delay)
         # El delay inicial lo manda la configuración: el guardado puede venir de una versión anterior del TOML
         # con otro valor, y conservarlo arrastraría un delay ajeno al encuentro.

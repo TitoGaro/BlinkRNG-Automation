@@ -78,3 +78,12 @@ def test_thousands_separator_follows_the_language():
     assert i18n.fmt_int(1234567) == "1.234.567"
     i18n.set_language("en")
     assert i18n.fmt_int(1234567.4) == "1,234,567"
+
+
+def test_preferences_with_unexpected_types_keep_the_good_values(tmp_path):
+    (tmp_path / "preferences.json").write_text(
+        '{"extra": null, "lead_s": "rápido", "serial_port": "COM3", "tid": 12345, "capture_index": 2.5}',
+        encoding="utf-8")
+    prefs = Preferences.load(tmp_path)
+    assert prefs.extra == {} and prefs.lead_s == Preferences().lead_s  # inválidos: por defecto
+    assert prefs.serial_port == "COM3" and prefs.tid == 12345  # válidos: se conservan

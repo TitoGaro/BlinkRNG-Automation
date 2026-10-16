@@ -127,7 +127,7 @@ class SeedMixin:
                 if now - last_try < 1.0:
                     continue
                 last_try = now
-                events = stream.all_events()
+                events = stream.final_events()  # sin el último parpadeo si aún puede cambiar (doble a medias)
                 calibrating = stream.threshold is None
                 if provisional is not None:
                     shown, needed = len(confirmations), scene.confirmation_blinks
@@ -314,13 +314,14 @@ class SeedMixin:
                   "Run this plan?",
                   label=target_label(self.d.encounter, target.traits), advance=target.advance,
                   wait=fmt_duration(wait_s), trigger=first.trigger),
-                timeout_s=max(5.0, first.send_t - ctx.now() - 1.0),  # el diálogo se cierra solo si ya no da tiempo
+                # El diálogo se cierra solo si ya no da tiempo (contando la ruta hasta el legendario, si la hay).
+                timeout_s=max(5.0, first.send_t - self._approach_lead() - ctx.now() - 1.0),
             )
             ctx.check()  # PARADA mientras el diálogo estaba abierto
             if ok is False:
                 raise InterventionRequired(t("Plan rechazado por el usuario", "Plan rejected by the user"),
                                            recoverable=False)
-            if ok is True and ctx.now() < first.send_t - 1.0:
+            if ok is True and ctx.now() < first.send_t - self._approach_lead() - 1.0:
                 return "WAIT_TRIGGER"
             ctx.log("warning", t("La aprobación llegó tarde para ese objetivo: se recalcula",
                                  "The approval came too late for that target: recalculating"))
@@ -592,6 +593,7 @@ class SeedMixin:
                             ctx.log("warning", t("El re-anclaje invalida el plan ({exc}); se busca otro objetivo",
                                                  "The re-anchor invalidates the plan ({exc}); looking for another "
                                                  "target", exc=exc))
+                            ctx.data["recovery"] = replace(rec, clock=clock)  # PLAN debe usar el reloj ya corregido
                             return "PLAN"
                     rec = replace(rec, clock=clock)
                     ctx.data.update(plan=plan, recovery=rec)
@@ -615,8 +617,15 @@ class SeedMixin:
         ctx.sleep_until(trigger.send_t)
         late = ctx.now() - trigger.send_t
         if late > trigger.margin_s * 0.5:
+            if self.d.encounter.approach:  # tras la ruta el personaje ya no está en la escena de parpadeos
+                ctx.log("warning", t("La pulsación llegaría {late:.0f} ms tarde tras la ruta: se reinicia el juego",
+                                     "The press would be {late:.0f} ms late after the route: restarting the game",
+                                     late=late * 1000))
+                return "RESET"
             ctx.log("warning", t("La pulsación llegaría {late:.0f} ms tarde: se recalcula el plan",
                                  "The press would be {late:.0f} ms late: recalculating the plan", late=late * 1000))
             return "PLAN"
-        self._press(ctx, Button.A if trigger.trigger.upper() == "A" else Button[trigger.trigger.upper()], trigger.label)
-        return "TIMELINE" if len(plan.presses) > 1 else "ENCOUNTER"
+        if len(plan.presses) == 1:  # sin timeline (p. ej. Cresselia): esta es ya la pulsación final
+            return self._send_final(ctx, trigger)
+        self._press(ctx, Button[trigger.trigger.upper()], trigger.label)
+        return "TIMELINE"

@@ -90,3 +90,15 @@ def test_report_dialog_builds_without_hardware(tmp_path):
     text = dialog.text.toPlainText()
     assert "### Entorno" in text and "no conectado" in text and str(Path.home()) not in text
     state.close()
+
+
+def test_a_huge_header_does_not_hang_the_url_builder():
+    """Si el usuario escribe un texto enorme al principio del informe, el enlace se recorta y no se cuelga."""
+    url, complete = issue_url("### Entorno\n" + "x" * 20000 + "\n\n### Últimos eventos\n```text\n```")
+    assert len(url) <= diagnostics.MAX_URL_CHARS and not complete
+
+
+def test_cut_jsonl_is_readable(tmp_path):
+    path = tmp_path / "timeline.jsonl"
+    path.write_bytes('{"t_s": 1, "kind": "state", "message": "ok"}\n{"message": "medio car'.encode() + "á".encode()[:1])
+    assert len(timeline_tail(path)) == 1  # un corte a mitad de un carácter no rompe la lectura

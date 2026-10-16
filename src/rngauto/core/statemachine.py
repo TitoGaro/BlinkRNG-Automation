@@ -228,6 +228,9 @@ class StateMachine:
                         break
                     return RunResult(Outcome.FAILED, name, t("Agotados los reintentos: {exc}", "Retries exhausted: {exc}", exc=exc), transitions)
                 except Exception as exc:  # error inesperado: fallo seguro
+                    if self.stop_event.is_set():  # p. ej. «Mando detenido»: es la PARADA, no un fallo
+                        transitions.append(Transition(name, t_enter, self.clock.now(), "STOPPED"))
+                        return RunResult(Outcome.STOPPED, name, t("Detenido", "Stopped"), transitions)
                     transitions.append(Transition(name, t_enter, self.clock.now(), "ERROR"))
                     self.timeline.add(self.clock.now(), "error", t("Error en {name}: {exc}", "Error in {name}: {exc}", name=name, exc=exc),
                                       data={"trace": traceback.format_exc(limit=5)})

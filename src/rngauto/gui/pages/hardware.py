@@ -131,6 +131,10 @@ class HardwarePage(Page):
         self.cam_chip.set_state("idle", t("buscando…", "searching…"))
         self.audio_chip.set_state("idle", "—")
 
+    def busy(self) -> bool:
+        """¿Hay una conexión o búsqueda en curso? (El resultado llegaría a esta página.)"""
+        return any(bg.running for bg in (self._bg_esp, self._bg_cam, self._bg_scan))
+
     # --- ciclo de vida ---
     def on_enter(self) -> None:
         self.preview.attach(lambda: self.state.session.latest() if self.state.session is not None else None)
@@ -318,7 +322,8 @@ class HardwarePage(Page):
             audio, audio_error = self.state.prepare_audio(name)  # también lento: aquí, no en la interfaz
             return session, name, audio, audio_error
 
-        self._bg_cam.run(open_it, timeout_s=45,
+        # Hasta 5 modos de prueba (cada uno abre, mide y cierra) más el audio: con capturadoras lentas >45 s.
+        self._bg_cam.run(open_it, timeout_s=120,
                          timeout_message=t("La capturadora no responde. Desenchúfala y vuelve a enchufarla.",
                                            "The capture card is not responding. Unplug it and plug it back in."))
 

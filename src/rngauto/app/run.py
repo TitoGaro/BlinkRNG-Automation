@@ -12,6 +12,7 @@ import signal
 from dataclasses import dataclass
 from pathlib import Path
 
+from rngauto.app.power import prevent_sleep
 from rngauto.core.encounter import EncounterConfiguration
 from rngauto.core.pokemon import TargetCriteria
 from rngauto.core.statemachine import Outcome
@@ -111,7 +112,8 @@ def run_encounter(opts: RunOptions) -> Outcome:
             target=machine.stop, args=(t("Parada de emergencia (Ctrl+C)", "Emergency stop (Ctrl+C)"),),
             daemon=True).start())
         try:
-            result = machine.run()
+            with prevent_sleep():  # esperas de horas: que Windows no suspenda el equipo
+                result = machine.run()
         finally:
             signal.signal(signal.SIGINT, previous)
             sink.close()

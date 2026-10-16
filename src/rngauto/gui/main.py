@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt, QTimer, QUrl
+from PySide6.QtCore import QLockFile, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
@@ -100,6 +100,8 @@ class MainWindow(QMainWindow):
         self.emergency.clicked.connect(self.state.request_stop)
         self.state.stop_requested.connect(self.run_page.stop)
         stop_key = QShortcut(QKeySequence("F12"), self)  # PARADA también con el teclado
+        # En toda la aplicación: también desde «Ver juego» o con un diálogo de la ejecución en primer plano.
+        stop_key.setContext(Qt.ShortcutContext.ApplicationShortcut)
         stop_key.activated.connect(lambda: self.state.request_stop() if self.emergency.isVisible() else None)
         self.run_page.running_changed.connect(self._running_changed)
         self.state.changed.connect(self._refresh)
@@ -266,10 +268,12 @@ class MainWindow(QMainWindow):
         code = self.language.currentData()
         if code == i18n.language():
             return
-        if self.state.running:
+        busy = self.state.running or any(getattr(p, "busy", lambda: False)() for p in self.pages)
+        if busy:
+            # Reconstruir la ventana a mitad de una conexión dejaría el mando o la capturadora abiertos sin dueño.
             QMessageBox.information(self, t("En marcha", "Running"),
-                                    t("Detén la ejecución antes de cambiar de idioma.",
-                                      "Stop the run before changing the language."))
+                                    t("Espera a que termine la ejecución o la conexión antes de cambiar de idioma.",
+                                      "Wait for the run or the connection to finish before changing the language."))
             self.language.blockSignals(True)  # devolver el desplegable al idioma actual sin volver a entrar aquí
             self.language.setCurrentIndex(self.language.findData(i18n.language()))
             self.language.blockSignals(False)
@@ -424,7 +428,17 @@ def _install_error_handlers(log_dir: Path) -> None:
         pass
     logger = logging.getLogger("rngauto")
 
+    last = {"text": "", "repeats": 0}
+
     def write(text: str) -> None:
+        # Un error que se repite (p. ej. en un temporizador) se registra una vez y se cuenta: si no, en minutos
+        # la rotación del registro borraría el primero, que es el que explica el fallo.
+        if text == last["text"]:
+            last["repeats"] += 1
+            return
+        if last["repeats"]:
+            logger.error("(el error anterior se repitió %d veces más)", last["repeats"])
+        last["text"], last["repeats"] = text, 0
         logger.error(text.rstrip())
 
     def hook(exc_type, exc, tb) -> None:
@@ -440,7 +454,8 @@ def _install_error_handlers(log_dir: Path) -> None:
 
             offer_report(QApplication.activeWindow(), t("Error inesperado", "Unexpected error"),
                          t("{exc}\n\nSe ha guardado el detalle en:\n{path}",
-                           "{exc}\n\nDetails were saved to:\n{path}", exc=exc, path=log_file), critical=True)
+                           "{exc}\n\nDetails were saved to:\n{path}", exc=exc, path=log_file), critical=True,
+                         modal=False)  # con una ejecución en marcha, Detener y F12 deben seguir funcionando
         finally:
             showing["now"] = False
             showing["last"] = time.monotonic()
@@ -451,9 +466,11 @@ def _install_error_handlers(log_dir: Path) -> None:
         traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback)))
 
 
-def self_test() -> int:
-    """Comprobación sin hardware (``--self-test``): carga encuentros y recursos y construye la ventana sin
-    mostrarla. Sirve para verificar un ejecutable recién compilado. Devuelve 0 si todo está bien."""
+def self_test(report: str | None = None) -> int:
+    """Comprobación sin hardware (``--self-test``): carga encuentros y recursos, las librerías del mando, la
+    capturadora y el sonido (sin abrir ningún dispositivo) y construye la ventana sin mostrarla. Sirve para
+    verificar un ejecutable recién compilado. Devuelve 0 si todo está bien; con ``report``, escribe además el
+    resultado en ese fichero (un ejecutable sin consola no muestra nada)."""
     import os
     import tempfile
 
@@ -463,11 +480,26 @@ def self_test() -> int:
     from rngauto.vision.ocr import SCRIPT
 
     os.environ["QT_QPA_PLATFORM"] = "offscreen"  # sin ventana: vale en un servidor sin pantalla
-    app = QApplication([])
+    app = QApplication.instance() or QApplication([])
     problems: list[str] = []
     for path in (ICON_PATH, SCRIPT, _MASTER_BALL_TEMPLATE, Path(theme._ASSETS) / "chevron_down.svg"):
         if not path.exists():
             problems.append(f"falta {path}")
+    try:  # librerías que solo se cargan al conectar el hardware: que estén dentro del ejecutable
+        import importlib
+
+        import cv2
+        import serial.tools.list_ports
+        import sounddevice
+
+        for module in ("cv2_enumerate_cameras", "rngauto.control.esp32"):
+            importlib.import_module(module)
+        serial.tools.list_ports.comports()  # solo lista los puertos, no abre ninguno
+        sounddevice.get_portaudio_version()  # la DLL de PortAudio carga
+        if not cv2.videoio_registry.hasBackend(cv2.CAP_MSMF):
+            problems.append("OpenCV sin Media Foundation (MSMF)")
+    except Exception as exc:
+        problems.append(f"hardware: {type(exc).__name__}: {exc}")
     try:
         if not static_templates() or not load_methods():
             problems.append("datos del juego vacíos")
@@ -483,7 +515,10 @@ def self_test() -> int:
             state.close()
     except Exception as exc:  # cualquier fallo de carga es un ejecutable roto
         problems.append(f"{type(exc).__name__}: {exc}")
-    print("self-test:", "OK" if not problems else "; ".join(problems))
+    result = "self-test: " + ("OK" if not problems else "; ".join(problems))
+    print(result)
+    if report:
+        Path(report).write_text(result + "\n", encoding="utf-8")
     return 1 if problems else 0
 
 
@@ -491,8 +526,11 @@ def main(argv: list[str] | None = None) -> int:
     """Punto de entrada de la aplicación de escritorio; devuelve el código de salida de Qt."""
     from rngauto.app.setup_store import DEFAULT_DATA_DIR
 
-    if "--self-test" in (argv if argv is not None else sys.argv):
-        return self_test()
+    args = argv if argv is not None else sys.argv
+    if "--self-test" in args or any(a.startswith("--self-test=") for a in args):
+        # «--self-test=<fichero>» deja además el resultado en ese fichero (para la integración continua).
+        report = next((a.split("=", 1)[1] for a in args if a.startswith("--self-test=")), None)
+        return self_test(report)
     _install_error_handlers(DEFAULT_DATA_DIR / "logs")
     app = QApplication(argv if argv is not None else sys.argv)
     app.setApplicationName(APP_NAME)
@@ -500,6 +538,13 @@ def main(argv: list[str] | None = None) -> int:
     app.setStyleSheet(theme.STYLE)
     if ICON_PATH.exists():
         app.setWindowIcon(QIcon(str(ICON_PATH)))
+    # Una sola copia abierta: dos se pelearían por el puerto del ESP32, la capturadora y los ficheros de datos.
+    DEFAULT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    lock = QLockFile(str(DEFAULT_DATA_DIR / "rngauto.lock"))
+    lock.setStaleLockTime(0)  # si la anterior se cerró de golpe, su bloqueo no cuenta (se comprueba el proceso)
+    if not lock.tryLock(200):
+        QMessageBox.information(None, APP_NAME, t("RNG Automation ya está abierto.", "RNG Automation is already open."))
+        return 0
     state = AppState()
     windows: dict[str, MainWindow] = {}  # referencia a la ventana actual para que no la recoja el recolector
 

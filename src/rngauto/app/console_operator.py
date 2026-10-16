@@ -2,7 +2,7 @@
 
 Implementa el ``Operator`` de la estrategia con ``input``/``print``. La verificación la hace el usuario
 tecleando lo que ve: shiny, naturaleza y stats (de los stats se deducen rangos de IV exactos).
-En modo automático, ``auto_confirm`` responde «sí» a las confirmaciones sin preguntar.
+En modo automático no hay nadie mirando: las preguntas de comprobación se quedan sin respuesta (``None``).
 """
 from __future__ import annotations
 
@@ -33,12 +33,20 @@ class ConsoleOperator:
         self.print(message)
 
     def confirm(self, message: str, timeout_s: float | None = None) -> bool | None:
-        """Pregunta sí/no; cualquier respuesta que no sea afirmativa cuenta como «no». ``timeout_s`` se ignora."""
+        """Pregunta sí/no. Una respuesta vacía no cuenta como «no»: es «sin respuesta» (``None``), igual que cerrar
+        la pregunta en la interfaz. En modo automático no hay nadie mirando: las preguntas que se hacen en ese
+        modo son de comprobación (¿ha salido shiny?, ¿se ve la Pokédex?) y nunca se contestan solas.
+        ``timeout_s`` se ignora."""
         if self.auto_confirm:
-            self.print(t("{message} → sí (automático)", "{message} → yes (automatic)", message=message))
+            self.print(t("{message} → sin respuesta (modo automático)", "{message} → no answer (automatic mode)",
+                         message=message))
+            return None
+        answer = self.input(t("{message} [s/n] ", "{message} [y/n] ", message=message)).strip().lower()
+        if answer in ("s", "si", "sí", "y", "yes"):
             return True
-        answer = self.input(t("{message} [s/N] ", "{message} [y/N] ", message=message)).strip().lower()
-        return answer in ("s", "si", "sí", "y", "yes")
+        if answer in ("n", "no"):
+            return False
+        return None
 
     def wait_ready(self, message: str) -> bool:
         self.input(t("{message} — pulsa Enter cuando esté listo ", "{message} — press Enter when ready ",

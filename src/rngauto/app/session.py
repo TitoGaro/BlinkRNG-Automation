@@ -10,6 +10,7 @@ grabación del ojo y del sonido) a partir de la sesión y de lo que se pide en `
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from collections.abc import Callable
@@ -33,6 +34,8 @@ from rngauto.vision.screen import ScreenSignatures
 
 from .audio import AudioRing
 from .setup_store import load_eye_setup, resolve_eye
+
+log = logging.getLogger(__name__)
 
 
 # (ancho, alto, fps, fourcc) por orden de preferencia. MJPEG primero: por USB 2.0, 1080p sin comprimir no
@@ -83,24 +86,29 @@ class RoiTap:
         self.recording = False
         self._recorder = None
         self._count = 0
+        self._disabled = False  # sin espacio o sin permiso: se deja de grabar, la ejecución sigue
 
     def read(self):
         frame = self.frames.read()
         if frame is None:
             return None
-        if self.recording:
-            from rngauto.vision.frames import Frame
+        if self.recording and not self._disabled:
             from rngauto.vision.replay import FrameRecorder
 
             crop = self.box.crop(frame.image)
-            if self._recorder is None and crop.size:
-                self._count += 1
-                self._recorder = FrameRecorder(self.folder / f"ojo_{self._count:02d}.avi", 60.0,
-                                               (crop.shape[1], crop.shape[0]))
-                self._shape = crop.shape
-            # Un recorte de otro tamaño (cambio de resolución) no cabe en el vídeo abierto: se descarta.
-            if self._recorder is not None and crop.shape == self._shape:
-                self._recorder.write(Frame(crop, frame.t_s, frame.index))
+            try:
+                if self._recorder is None and crop.size:
+                    self._count += 1
+                    self._recorder = FrameRecorder(self.folder / f"ojo_{self._count:02d}.avi", 60.0,
+                                                   (crop.shape[1], crop.shape[0]))
+                    self._shape = crop.shape
+                # Un recorte de otro tamaño (cambio de resolución) no cabe en el vídeo abierto: se descarta.
+                if self._recorder is not None and crop.shape == self._shape:
+                    self._recorder.write(Frame(crop, frame.t_s, frame.index))
+            except (OSError, RuntimeError):  # disco lleno, sin permiso…: la grabación es solo para diagnóstico
+                log.warning("Se deja de grabar el vídeo del ojo", exc_info=True)
+                self._disabled = True
+                self.close()
         elif self._recorder is not None:
             self._recorder.close()
             self._recorder = None
@@ -339,10 +347,14 @@ def build_static_run(
     calibration = CalibrationHistory.load(cal_path, enc.id, enc.final.final_delay)
 
     def on_attempt(a: AttemptRecord) -> None:
-        if session_dir is not None:
-            with (session_dir / "attempts.jsonl").open("a", encoding="utf-8") as f:
-                f.write(json.dumps(a.to_dict(), ensure_ascii=False) + "\n")
-        calibration.save(cal_path)
+        # Un fallo al guardar (disco lleno, fichero bloqueado) no puede tapar el resultado del intento.
+        try:
+            if session_dir is not None:
+                with (session_dir / "attempts.jsonl").open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(a.to_dict(), ensure_ascii=False) + "\n")
+            calibration.save(cal_path)
+        except OSError:
+            log.warning("No se pudo guardar el intento ni la calibración", exc_info=True)
 
     if session.demo:
         sim = session.sim

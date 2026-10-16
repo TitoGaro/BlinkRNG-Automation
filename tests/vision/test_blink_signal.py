@@ -136,3 +136,24 @@ def test_second_close_in_the_ambiguous_zone_is_not_a_phantom_roll():
     events = group_blinks([b(10.00), b(10.58), b(12.04)], threshold=0.1)
     assert [round(e.t_s, 2) for e in events] == [10.00, 12.04]
     assert events[0].kind is None
+
+
+def test_final_events_leave_out_a_double_blink_still_in_progress():
+    """Un doble del que solo ha llegado el primer cierre parecería simple: hasta que es definitivo no se usa."""
+    from rngauto.vision.blink_signal import BlinkEventStream, MatchSample
+
+    def score(t):  # simple a 5 s y doble a 10,00 + 10,35 s
+        return 0.5 if any(c <= t < c + 0.1 for c in (5.0, 10.0, 10.35)) else 0.9
+
+    def stream_until(t_end):
+        s = BlinkEventStream(fixed_threshold=0.2)
+        i = 0
+        while i / 60 <= t_end:
+            s.feed(MatchSample(i / 60, score(i / 60), True, i))
+            i += 1
+        return s
+
+    partial = stream_until(10.2)  # aún no ha llegado el segundo cierre
+    assert [round(e.t_s) for e in partial.final_events()] == [5]
+    done = stream_until(11.5)
+    assert [e.kind.name for e in done.final_events()] == ["SINGLE", "DOUBLE"]

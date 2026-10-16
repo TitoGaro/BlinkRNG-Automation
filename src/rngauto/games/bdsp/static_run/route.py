@@ -13,7 +13,8 @@ from rngauto.vision.screen import changed_fraction, thumbnail
 from ..battle import TEXT_REGION, choice_box_visible
 from ..fast_advance import AdvanceMethod, DIALOG_KINDS, MacroStep
 from ..planner import Plan
-from ..screens import dialog_arrow_visible, dialog_visible
+from ..screens import battle_menu_visible, dialog_arrow_visible, dialog_visible
+from ..shiny import battle_dialog_visible
 from .config import POKEMON_MEAN_INTERVAL_S, screen_name
 
 
@@ -256,6 +257,24 @@ class RouteMixin:
                 return missing_since
         return None
 
+    def _reset_unless_battle(self, ctx: StateContext) -> str:
+        """Tras la A de inicio, antes de reiniciar se mira si el combate ya ha empezado (p. ej. una A de más cerró
+        el texto del legendario). Si es así, nunca se reinicia: se pasa a ENCOUNTER para mirar si es shiny, y el
+        intento no se usa para calibrar."""
+        end = ctx.now() + 1.5
+        while ctx.now() < end:
+            frame = self._next_frame(ctx)
+            if battle_dialog_visible(frame.image) or battle_menu_visible(frame.image):
+                ctx.log("warning", t("El combate ya ha empezado: no se reinicia, se mira si es shiny (el intento no "
+                                     "sirve para calibrar)",
+                                     "The battle has already started: not restarting, checking whether it is shiny "
+                                     "(the attempt cannot be used for calibration)"))
+                self._battle_possible = True
+                ctx.data["early_start"] = True
+                ctx.data["final_sent_t"] = frame.t_s - 1.0
+                return "ENCOUNTER"
+        return "RESET"
+
     def timeline(self, ctx: StateContext) -> str:
         """TIMELINE: tras la pulsación de inicio, ejecuta los pasos de la fase y envía la pulsación final.
 
@@ -277,11 +296,11 @@ class RouteMixin:
                                    "reinicia el juego",
                                    "The timeline steps did not go as expected: the final A is not pressed and the "
                                    "game is restarted"))
-                return "RESET"
+                return self._reset_unless_battle(ctx)
             if ctx.now() > plan.final.send_t - 1.0:
                 ctx.log("error", t("Los pasos del timeline terminaron demasiado tarde: se reinicia el juego",
                                    "The timeline steps finished too late: restarting the game"))
-                return "RESET"
+                return self._reset_unless_battle(ctx)
         if self.d.encounter.approach:
             # Al hablarle debe aparecer su diálogo; si no, el timeline no ha empezado y la A final no serviría.
             started = self._wait_screen(ctx, lambda f: dialog_visible(f.image),
@@ -291,7 +310,7 @@ class RouteMixin:
                                    "final y se reinicia el juego",
                                    "The dialog with the legendary did not start (was it not in front?): the final A "
                                    "is not pressed and the game is restarted"))
-                return "RESET"
+                return self._reset_unless_battle(ctx)
             ctx.log("detection", t("Diálogo con el legendario: timeline en marcha",
                                    "Dialog with the legendary: timeline running"))
             gone_t = self._dialog_gone_before(ctx, plan.final.send_t - 2.0)
@@ -314,8 +333,4 @@ class RouteMixin:
                                          "Reinicia el juego y vuelve a empezar",
                                          "The final press would be {late:.0f} ms late: not pressing. "
                                          "Restart the game and start again", late=late * 1000))
-        self._battle_possible = True  # desde aquí puede haber un shiny en pantalla: nunca se reinicia solo
-        self._press(ctx, Button[plan.final.trigger.upper()], "final")
-        ctx.data["final_sent_t"] = plan.final.send_t
-        self._auto_restarts = 0  # el intento ha llegado hasta el final
-        return "ENCOUNTER"
+        return self._send_final(ctx, plan.final)

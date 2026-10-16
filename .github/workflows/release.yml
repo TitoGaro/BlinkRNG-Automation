@@ -2,20 +2,25 @@ name: Release
 
 # Al subir una etiqueta vX.Y.Z (igual que __version__ de src/rngauto/__init__.py): tests, ejecutable de Windows,
 # autocomprobación del ejecutable y publicación en GitHub Releases con el zip y su suma SHA-256.
+# La compilación no tiene permiso de escritura; solo el último paso, que publica lo ya comprobado.
 on:
   push:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
+
+env:
+  ZIP: BlinkRNG-Automation-${{ github.ref_name }}-windows.zip
 
 jobs:
-  release:
+  build:
     runs-on: windows-latest
-    env:
-      ZIP: BlinkRNG-Automation-${{ github.ref_name }}-windows.zip
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v7
         with:
@@ -44,8 +49,15 @@ jobs:
       - name: Autocomprobación del ejecutable
         shell: pwsh
         run: |
+          # El ejecutable no tiene consola: el resultado queda en self-test.txt. Plazo de 2 minutos.
+          $report = Join-Path $env:RUNNER_TEMP "self-test.txt"
           $p = Start-Process -FilePath dist/BlinkRNG-Automation/BlinkRNG-Automation.exe `
-                             -ArgumentList "--self-test" -Wait -PassThru
+                             -ArgumentList "--self-test=$report" -PassThru
+          if (-not $p.WaitForExit(120000)) {
+            Stop-Process -Id $p.Id -Force
+            throw "La autocomprobación del ejecutable no ha terminado en 2 minutos"
+          }
+          if (Test-Path $report) { Get-Content $report } else { "(sin informe)" }
           if ($p.ExitCode -ne 0) { throw "La autocomprobación del ejecutable ha fallado ($($p.ExitCode))" }
 
       - name: Zip y suma SHA-256
@@ -55,11 +67,43 @@ jobs:
           $hash = (Get-FileHash $env:ZIP -Algorithm SHA256).Hash.ToLower()
           "$hash  $env:ZIP" | Out-File -Encoding ascii "$env:ZIP.sha256"
 
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: |
+            ${{ env.ZIP }}
+            ${{ env.ZIP }}.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+
+      - name: Comprobar la suma SHA-256
+        run: sha256sum --check "$ZIP.sha256"
+
       - name: Publicar la release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >
-          gh release create "${{ github.ref_name }}" "$env:ZIP" "$env:ZIP.sha256"
-          --title "RNG Automation ${{ github.ref_name }}"
-          --notes-file packaging/release_notes.md
-          --generate-notes
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Primero como borrador; se hace pública solo si los dos ficheros han subido completos.
+          gh release create "$TAG" "$ZIP" "$ZIP.sha256" --draft --verify-tag \
+            --title "RNG Automation $TAG" --notes-file packaging/release_notes.md --generate-notes
+          uploaded=$(gh release view "$TAG" --json assets --jq '[.assets[] | select(.state == "uploaded")] | length')
+          if [ "$uploaded" != "2" ]; then
+            echo "La release se ha quedado como borrador: faltan ficheros ($uploaded de 2)"; exit 1
+          fi
+          gh release edit "$TAG" --draft=false

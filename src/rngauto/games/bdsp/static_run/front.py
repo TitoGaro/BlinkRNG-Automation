@@ -54,7 +54,7 @@ def _front_search(rec: BlinkRecovery, events: list, blinks: int, until_t: float,
             hi = expected + enc_window[1] + int((t0 - started) / 3.0)
         try:
             return reidentify_with_pokemon(rec.result.state, ticks, period, lo, hi), window, period, t0, errors
-        except RecoveryError as exc:
+        except (RecoveryError, ValueError) as exc:  # ValueError: la tirada 0 no cae en un parpadeo
             errors.append((n, exc))
     return None, window, period, t0, errors
 
