@@ -126,6 +126,12 @@ In the `%USERPROFILE%\.rngauto\` folder ("Open data folder" button in History):
 | "Fast advance cancelled" | The game did not show the menu or the Pokédex in time (the technical details say which). If you changed capture card, use "Relearn the Pokédex screen" |
 | Something is slow and not responding (controller or capture card) | No operation waits forever: after a few seconds a warning appears and you can try again. If it keeps happening, unplug the device and plug it back in |
 
+**If it does not go away, report it:** click "Report the problem" in the error message, or the info button
+(bottom left) → "Report a problem". The app prepares a report with the version, your setup and the latest
+events (without your user name or your folders), lets you review it and opens the GitHub form already filled
+in. For detection problems, also attach the eye video of the session ("Open logs folder" → `sessions`). The
+app keeps the video of the last 5 runs and all the text logs.
+
 ## Encounter status
 
 In the Target step, the list separates the encounters verified on a real console ("Verified on a console")

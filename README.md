@@ -88,8 +88,9 @@ El programa nunca guarda la partida, así que al reiniciar siempre vuelves a tu 
 
 Todo se ejecuta en tu PC. La aplicación no se conecta a internet ni recoge datos de uso. Guarda sus datos en
 `%USERPROFILE%\.rngauto`: las plantillas del ojo, los ajustes, la calibración, los registros y grabaciones
-cortas del ojo de tu personaje y de cada entrada en combate, que sirven para mejorar la detección. Puedes
-borrar esa carpeta cuando quieras.
+del ojo de tu personaje (de las 5 últimas ejecuciones) y de cada entrada en combate, que sirven para mejorar la
+detección. Puedes borrar esa carpeta cuando quieras. Si informas de un fallo desde la aplicación, ves el informe
+antes de enviarlo y no incluye tu nombre de usuario ni tus carpetas.
 
 ## Uso responsable
 

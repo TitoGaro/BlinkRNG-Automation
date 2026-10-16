@@ -46,6 +46,28 @@ CAPTURE_MODES = [
 ]
 
 
+EYE_VIDEO_SESSIONS = 5  # ejecuciones cuyo vídeo del ojo se conserva: cada una ocupa cientos de MB
+
+
+def prune_eye_videos(sessions_dir: Path, keep: int = EYE_VIDEO_SESSIONS) -> int:
+    """Borra el vídeo del ojo (``ojo_*.avi`` y sus tiempos) de las ejecuciones más antiguas y conserva el de las
+    ``keep`` más recientes. Los registros de texto (``timeline.jsonl``, ``attempts.jsonl``) no se tocan: ocupan
+    poco y sirven para el historial y para depurar. Devuelve los bytes liberados."""
+    if not sessions_dir.is_dir():
+        return 0
+    folders = sorted((p for p in sessions_dir.iterdir() if p.is_dir()), key=lambda p: p.name)
+    freed = 0
+    for folder in folders[:-keep] if keep > 0 else folders:
+        for video in [*folder.glob("ojo_*.avi"), *folder.glob("ojo_*.frames.jsonl")]:
+            try:
+                size = video.stat().st_size
+                video.unlink()
+                freed += size
+            except OSError:  # abierto por otro programa: se intentará la próxima vez
+                continue
+    return freed
+
+
 class RoiTap:
     """Pasa los frames y, mientras ``recording``, guarda el recorte del ojo (vídeo + tiempos) para
     poder analizar después un fallo de detección sin repetir la prueba (``rngauto recover``).
@@ -346,6 +368,7 @@ def build_static_run(
     frames = session.frames
     status_cb = on_status
     if not session.demo and session_dir is not None:
+        prune_eye_videos(session_dir.parent)  # incluye la actual: quedan las EYE_VIDEO_SESSIONS más recientes
         tap = RoiTap(session.frames, matcher.box, session_dir)
         frames = tap
         status_cb = _record_while_collecting(tap, on_status)

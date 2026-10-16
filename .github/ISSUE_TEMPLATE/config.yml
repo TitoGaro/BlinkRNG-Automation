@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Guía de uso / User guide
+    url: https://github.com/TitoGaro/BlinkRNG-Automation/blob/main/docs/03-guia-puesta-en-marcha.md
+    about: Preparación de la partida, pasos de la aplicación y problemas frecuentes · Save file setup, app steps and common problems
+  - name: Guía de encuentros / Encounter guide
+    url: https://github.com/TitoGaro/BlinkRNG-Automation/blob/main/docs/guia-encuentros.md
+    about: Dónde guardar para cada legendario · Where to save for each legendary

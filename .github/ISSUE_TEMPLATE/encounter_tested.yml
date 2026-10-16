@@ -1,0 +1,45 @@
+name: Encuentro probado / Encounter tested
+description: Has probado un encuentro marcado como «sin probar» · You tried an encounter marked as "not tested"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ¡Gracias! Con esto se puede marcar el encuentro como comprobado en la próxima versión.
+        Thank you! This lets the encounter be marked as verified in the next version.
+
+  - type: input
+    id: encounter
+    attributes:
+      label: Encuentro / Encounter
+      placeholder: "azelf"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: result
+    attributes:
+      label: Resultado / Result
+      options:
+        - Funciona (llegó al objetivo) / Works (target reached)
+        - Funciona a medias / Partly works
+        - No funciona / Does not work
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versión / Version
+      placeholder: "1.0.0"
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Detalles / Details
+      description: Intentos hasta acertar, delay calibrado (paso «Historial»), qué falló · Attempts until it hit, calibrated delay (History step), what failed
+
+  - type: textarea
+    id: diagnostic
+    attributes:
+      label: Informe de diagnóstico / Diagnostic report
+      description: Opcional · Optional («Créditos → Informar de un problema» · "Credits → Report a problem")

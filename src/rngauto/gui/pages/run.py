@@ -32,6 +32,7 @@ from rngauto.i18n import fmt_int, t
 from .. import theme
 from ..icons import icon
 from ..operator import GuiOperator
+from ..report import offer_report
 from ..widgets import PhaseStepper, Tile, VideoView, label, panel
 from .base import Page
 
@@ -547,15 +548,16 @@ class RunPage(Page):
             self.message.setText(t("Detenido. El mando está en neutro.", "Stopped. The controller is in neutral."))
         elif result.outcome is Outcome.INTERVENTION:
             self.message.setText(t("Necesito tu ayuda: {msg}", "I need your help: {msg}", msg=result.message))
-            QMessageBox.warning(self, t("Necesito tu ayuda", "I need your help"),
-                                t("{msg}\n\nNo se ha hecho nada más para no arriesgar la partida. "
-                                  "Revisa la situación y vuelve a pulsar Empezar cuando quieras.",
-                                  "{msg}\n\nNothing else was done so as not to risk the save. "
-                                  "Check the situation and press Start again whenever you are ready.",
-                                  msg=result.message))
+            offer_report(self, t("Necesito tu ayuda", "I need your help"),
+                         t("{msg}\n\nNo se ha hecho nada más para no arriesgar la partida. "
+                           "Revisa la situación y vuelve a pulsar Empezar cuando quieras.",
+                           "{msg}\n\nNothing else was done so as not to risk the save. "
+                           "Check the situation and press Start again whenever you are ready.",
+                           msg=result.message))
         else:
             self.message.setText(t("Error: {msg}", "Error: {msg}", msg=result.message))
-            QMessageBox.critical(self, t("Error", "Error"),
-                                 t("{msg}\n\nEl detalle está en «Detalles técnicos».",
-                                   "{msg}\n\nSee Technical details for more information.", msg=result.message))
+            offer_report(self, t("Error", "Error"),
+                         t("{msg}\n\nEl detalle está en «Detalles técnicos».",
+                           "{msg}\n\nSee Technical details for more information.", msg=result.message),
+                         critical=True)
         self.completion_changed.emit()

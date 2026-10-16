@@ -85,9 +85,10 @@ The program never saves your game, so restarting it always brings you back to yo
 ## Privacy
 
 Everything runs on your PC. The app makes no network connections and collects no telemetry. It keeps its
-data in `%USERPROFILE%\.rngauto`: your eye templates, settings, calibration, logs, and short recordings of
-your character's eye and of each battle start, used to improve detection. You can delete that folder at any
-time.
+data in `%USERPROFILE%\.rngauto`: your eye templates, settings, calibration, logs, and recordings of
+your character's eye (from the last 5 runs) and of each battle start, used to improve detection. You can delete
+that folder at any time. If you report a problem from the app, you see the report before sending it, and it does
+not include your user name or your folders.
 
 ## Responsible use
 

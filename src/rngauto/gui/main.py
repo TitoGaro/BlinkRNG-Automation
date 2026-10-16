@@ -403,34 +403,44 @@ class MainWindow(QMainWindow):
 
 
 def _install_error_handlers(log_dir: Path) -> None:
-    """Sin consola (pythonw), los errores se verían «en silencio»: se registran y se muestran (uno a la vez)."""
-    import datetime as dt
+    """Sin consola (ejecutable o pythonw), los errores se perderían: van a ``errores.log`` (también los avisos de
+    ``logging`` de cualquier módulo) y los de la interfaz se muestran en un diálogo, uno a la vez."""
+    import logging
     import threading
     import time
     import traceback
+    from logging.handlers import RotatingFileHandler
 
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "errores.log"
     showing = {"now": False, "last": 0.0}
+    try:  # 1 MB y dos copias anteriores como mucho: el registro no crece sin límite
+        handler = RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=2, encoding="utf-8")
+        handler.setFormatter(logging.Formatter("\n[%(asctime)s] %(levelname)s %(name)s\n%(message)s",
+                                               "%Y-%m-%d %H:%M:%S"))
+        logging.getLogger().addHandler(handler)
+        logging.getLogger().setLevel(logging.WARNING)
+    except OSError:  # carpeta sin permisos: la aplicación funciona igual, sin registro
+        pass
+    logger = logging.getLogger("rngauto")
 
     def write(text: str) -> None:
-        try:
-            with log_file.open("a", encoding="utf-8") as f:
-                f.write(f"\n[{dt.datetime.now():%Y-%m-%d %H:%M:%S}]\n{text}")
-        except OSError:
-            pass
+        logger.error(text.rstrip())
 
     def hook(exc_type, exc, tb) -> None:
-        """Excepción no capturada en el hilo de la interfaz: se registra y se muestra en un diálogo."""
+        """Excepción no capturada en el hilo de la interfaz: se registra y se muestra en un diálogo, con la opción
+        de informar del problema."""
         write("".join(traceback.format_exception(exc_type, exc, tb)))
         # Un error repetido (p. ej. en un temporizador) no debe apilar diálogos: uno a la vez y como mucho cada 10 s.
         if QApplication.instance() is None or showing["now"] or time.monotonic() - showing["last"] < 10:
             return
         showing["now"] = True
         try:
-            QMessageBox.critical(None, t("Error inesperado", "Unexpected error"),
-                                 t("{exc}\n\nSe ha guardado el detalle en:\n{path}",
-                                   "{exc}\n\nDetails were saved to:\n{path}", exc=exc, path=log_file))
+            from .report import offer_report
+
+            offer_report(QApplication.activeWindow(), t("Error inesperado", "Unexpected error"),
+                         t("{exc}\n\nSe ha guardado el detalle en:\n{path}",
+                           "{exc}\n\nDetails were saved to:\n{path}", exc=exc, path=log_file), critical=True)
         finally:
             showing["now"] = False
             showing["last"] = time.monotonic()

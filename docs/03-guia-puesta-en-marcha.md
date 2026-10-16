@@ -123,6 +123,13 @@ En la carpeta `%USERPROFILE%\.rngauto\` (botón «Abrir carpeta de datos» en el
 | «Avance rápido cancelado» | El juego no mostró el menú o la Pokédex a tiempo (los detalles técnicos dicen cuál). Si cambiaste de capturadora, usa «Volver a aprender la pantalla de la Pokédex» |
 | Algo tarda y no responde (mando o capturadora) | Ninguna operación espera para siempre: tras unos segundos aparece un aviso y puedes reintentar. Si se repite, desenchufa y vuelve a enchufar el dispositivo |
 
+**Si no se soluciona, informa del fallo:** pulsa «Informar del problema» en el aviso de error, o el botón de
+información (abajo a la izquierda) → «Informar de un problema». La aplicación prepara un informe con la versión,
+tu montaje y los últimos eventos (sin tu nombre de usuario ni tus carpetas), te deja revisarlo y abre el
+formulario de GitHub ya rellenado. Si el fallo es de detección, adjunta también el vídeo del ojo de la sesión
+(«Abrir carpeta de registros» → `sessions`). La aplicación guarda el vídeo de las 5 últimas ejecuciones; los
+registros de texto, todos.
+
 ## Estado de los encuentros
 
 En el paso Objetivo, la lista separa los encuentros comprobados en una consola real («Comprobados en consola»)

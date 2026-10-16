@@ -89,4 +89,13 @@ class AboutDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.button(QDialogButtonBox.StandardButton.Close).setText(t("Cerrar", "Close"))
         buttons.rejected.connect(self.reject)
+        report = buttons.addButton(t("Informar de un problema", "Report a problem"),
+                                   QDialogButtonBox.ButtonRole.ActionRole)
+        report.clicked.connect(self._report)
         lay.addWidget(buttons)
+
+    def _report(self) -> None:
+        """Abre «Informar de un problema» con los datos de la ventana principal."""
+        from .report import ReportDialog
+
+        ReportDialog(self.parentWidget()).exec()

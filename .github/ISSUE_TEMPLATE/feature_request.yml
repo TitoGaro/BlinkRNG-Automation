@@ -1,0 +1,15 @@
+name: Sugerencia / Feature request
+description: Una idea para mejorar la aplicación · An idea to improve the app
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Qué propones / What do you suggest
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Para qué te serviría / Why it would help
