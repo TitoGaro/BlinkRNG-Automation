@@ -1,0 +1,97 @@
+# Lugia — Parque Hansa, Sala de la Tormenta, Losa Tormenta.
+# Juego: Perla Reluciente.
+#
+# Inicio: delante del pedestal, mirando hacia la cámara, con el mensaje del profesor Serbal (caña).
+# Ruta (la misma en todo el Parque Hansa):
+#   1. Aproximación: girarse hacia el pedestal, colocar la losa (Sí) y dejar en pantalla «¡El pedestal ha
+#      comenzado a brillar!».
+#   2. A de inicio del timeline: cierra ese texto y provoca el fogonazo blanco y la entrada en el Espacio
+#      Puro (~5 s), con el legendario delante.
+#   3. Caminar hasta él pulsando A hasta que habla (no depende de la distancia); la A final, en el avance
+#      calculado, inicia el combate.
+schema_version = 1
+
+[encounter]
+id = "hansa_lugia"       # identificador único; coincide con el nombre del fichero
+version = "0.2"          # versión de esta configuración (aparece en los registros de cada intento)
+game = "bdsp"
+strategy = "static"      # legendario estático: se genera al interactuar con él
+template = "lugia"       # plantilla de generación con la que se busca el objetivo
+games = ["SP"]           # versiones en que está: BD = Diamante Brillante, SP = Perla Reluciente
+display_name = "Lugia (Parque Hansa, Losa Tormenta)"
+display_name_en = "Lugia (Ramanas Park, Squall Slate)"
+status = "comprobado"    # «comprobado» (en consola real), «sin_probar» o «borrador»
+
+# Punto de partida. Textos para el usuario: clave en español y la misma con «_en» en inglés.
+[start]
+name = "Sala de la Tormenta (Parque Hansa), delante del pedestal"
+name_en = "Squall Room (Ramanas Park), in front of the pedestal"
+description = "Delante del pedestal de la losa, mirando hacia abajo (hacia la cámara), con la partida guardada ahí."
+description_en = "In front of the slate pedestal, facing down (towards the camera), with the game saved there."
+instructions = "Carga la partida y no te muevas: el programa usa la caña para que salga el mensaje de Serbal."
+instructions_en = "Load the save and do not move: the program uses the fishing rod to bring up Rowan's message."
+
+[blink_scene]
+eye_template = "bdsp/eyes/hansa_inicio.png"  # ojo por defecto; se usa el que se marque en el paso «Escena»
+box = [0.48, 0.62, 0.04, 0.06]               # zona donde buscar el ojo: [x, y, ancho, alto] normalizados (0-1)
+message = true           # se observa con el mensaje de Serbal en pantalla: así el personaje no gira la cabeza
+min_blinks = 33          # parpadeos para identificar la semilla: 33 si no se descarta ninguno; si no, 40
+confirmation_blinks = 2  # pocos: la reidentificación tras la Pokédex y la vigilancia ya comprueban el estado
+
+# Quién consume RNG mientras se observa: npc = personas del mapa, pokemon_npc = Pokémon que parpadean.
+[blink_scene.scene]
+npc = 0
+pokemon_npc = 0          # el legendario aún no está cargado
+
+[approach]
+lead_s = 22.0            # empieza 22 s antes del inicio del timeline
+# Pasos (tipos en la clase MacroStep de games/bdsp/fast_advance.py). Los textos no se leen (vale en cualquier
+# idioma): «dialog_until_choice» pulsa A en cada texto hasta la caja Sí/No (la reconoce por su forma) y no
+# la contesta; «dialog_next» espera un texto terminado con ▼ («sigue») y pulsa A; «dialog_settle» espera un
+# texto quieto sin ▼ y no pulsa: la siguiente A es la de inicio del timeline.
+steps = [
+  { kind = "hold", button = "UP", ms = 90, wait_ms = 800 },     # girarse hacia el pedestal
+  { kind = "dialog_until_choice", ms = 12000 },                  # «Hay un pedestal…» → «¿Quieres colocar…?» + Sí/No
+  { kind = "press", button = "A", ms = 80, wait_ms = 300 },      # Sí (el cursor está en «Sí»)
+  { kind = "dialog_next", ms = 12000 },                          # «Has colocado la Losa…» ▼
+  { kind = "dialog_settle", ms = 6000 },                         # «¡El pedestal ha comenzado a brillar!»
+]
+
+# Timeline: desde la pulsación de inicio, el RNG avanza así: «blank_reads» llamadas inmediatas, una pausa sin
+# consumo de «pause_s» s, «fixed_delay» llamadas fijas y después la escena de [timeline.scene].
+# El inicio es la A que cierra «…a brillar!», no la de hablar con el legendario: si se toma esta última, el
+# tiempo que el legendario lleva parpadeando varía en cada intento y el delay sale disperso.
+[[timeline]]
+name = "entrada en el Espacio Puro"
+trigger = "A"          # pulsación que inicia el timeline
+blank_reads = 1        # lectura del RNG al pulsar
+pause_s = 3.0          # fogonazo blanco
+fixed_delay = 3        # llamadas fijas tras el fogonazo
+# Pasos entre el inicio y la pulsación final. No cambian el RNG: la escena del timeline ya cuenta los
+# parpadeos. «walk_talk» camina hacia «button» y pulsa A tras cada tramo hasta que sale su texto (como mucho
+# «ms» ms).
+steps = [
+  { kind = "wait", ms = 5500 },                                  # fogonazo y entrada (~5 s)
+  { kind = "walk_talk", button = "UP", ms = 8000 },              # caminar hasta él y hablarle
+]
+
+[timeline.scene]
+npc = 0
+pokemon_npc = 1        # el legendario parpadea
+
+[final]
+trigger = "A"          # pulsación que genera el Pokémon
+final_delay = 85       # avances entre la pulsación final y la generación; delay inicial, se calibra solo
+min_timeline_s = 15.0  # tiempo mínimo entre el inicio del timeline y la pulsación final
+min_gap_margin_s = 0.12  # margen mínimo (s) a cada lado de la pulsación final
+
+# Acciones de avance rápido permitidas en la espera (ids de src/rngauto/games/bdsp/data/fast_advance.toml).
+[fast_advance]
+methods = ["pokedex_peek", "pokedex_scroll"]
+
+[verification]
+observe = ["shiny", "nature", "stats"]  # qué se lee de la ficha del Pokémon obtenido
+species = ["lugia"]                     # especies posibles (estadísticas base con las que se interpreta la ficha)
+
+[recovery]
+method = "restart_game"  # para repetir el intento: reiniciar el juego y cargar la partida

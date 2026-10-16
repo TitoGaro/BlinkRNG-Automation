@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rngauto"
+dynamic = ["version"]
+description = "Blink RNG automation for static encounters in Pokémon Brilliant Diamond and Shining Pearl (ESP32 + capture card)"
+requires-python = ">=3.12"
+authors = [{ name = "TitoGaro" }]
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+classifiers = [
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment",
+    "Environment :: Win32 (MS Windows)",
+    "Natural Language :: English",
+    "Natural Language :: Spanish",
+]
+dependencies = [
+    "numpy>=1.26,<3",
+    "opencv-python>=4.8,<6",
+    "pyserial>=3.5,<4",
+    "PySide6>=6.8,<7",
+    "sounddevice>=0.4,<1",
+    "cv2-enumerate-cameras>=1.1,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+build = ["pyinstaller>=6.11"]  # ejecutable de Windows (packaging/rngauto.spec)
+
+[project.urls]
+Homepage = "https://github.com/TitoGaro/BlinkRNG-Automation"
+Issues = "https://github.com/TitoGaro/BlinkRNG-Automation/issues"
+Releases = "https://github.com/TitoGaro/BlinkRNG-Automation/releases"
+
+[project.scripts]
+rngauto = "rngauto.app.cli:main"
+
+[project.gui-scripts]
+rngauto-gui = "rngauto.gui.main:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "rngauto.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rngauto = ["games/bdsp/data/*.json", "games/bdsp/data/*.toml", "games/bdsp/data/plantillas/*.png", "gui/icon.png", "gui/assets/*.svg", "vision/ocr.ps1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "slow: tests lentos (búsquedas grandes)",
+    "hardware: requieren ESP32/capturadora reales (desactivados por defecto)",
+    "local: usan grabaciones privadas en ~/.rngauto o repos de referencia locales (se omiten si no están)",
+]

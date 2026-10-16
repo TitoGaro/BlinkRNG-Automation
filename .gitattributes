@@ -1,0 +1,7 @@
+# Normaliza los finales de línea en el repositorio; el .bat y el script de PowerShell necesitan CRLF en Windows.
+* text=auto
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary

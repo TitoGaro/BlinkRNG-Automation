@@ -1,0 +1,124 @@
+# Regigigas — Templo Puntaneva. Juegos: Diamante Brillante y Perla Reluciente.
+#
+# Inicio: en el piso de arriba, frente a las escaleras que bajan a su sala, con el mensaje del profesor Serbal
+# (caña). Ahí Regigigas no está cargado y la semilla sale limpia.
+# Ruta: bajar y resolver el puzle de hielo (~47 s) → reidentificar delante de él → hablarle hasta su último texto
+# → A de inicio del timeline → A final → combate.
+# Por qué se reidentifica delante: sus parpadeos gastan RNG desde que se entra en su sala, y con solo la semilla de
+# arriba el delay medido salía disperso (172-183).
+schema_version = 1
+
+[encounter]
+id = "regigigas"         # identificador único; coincide con el nombre del fichero
+version = "1.1"          # versión de esta configuración (aparece en los registros de cada intento)
+game = "bdsp"
+strategy = "static"      # legendario estático: se genera al interactuar con él
+template = "regigigas"   # plantilla de generación con la que se busca el objetivo
+games = ["BD", "SP"]     # versiones en que está: BD = Diamante Brillante, SP = Perla Reluciente
+display_name = "Regigigas (Templo Puntaneva)"
+display_name_en = "Regigigas (Snowpoint Temple)"
+status = "comprobado"    # «comprobado» (en consola real), «sin_probar» o «borrador»
+
+# Punto de partida. Textos para el usuario: clave en español y la misma con «_en» en inglés.
+[start]
+name = "Piso superior a Regigigas"
+name_en = "Floor above Regigigas"
+description = "Personaje frente a las escaleras que bajan a la sala de Regigigas."
+description_en = "Character facing the stairs that lead down to Regigigas's chamber."
+instructions = "Carga la partida justo antes de bajar las escaleras, con Regirock, Regice y Registeel en el equipo. Usa la caña para el mensaje y no te muevas."
+instructions_en = "Load the save just before going down the stairs, with Regirock, Regice and Registeel in your party. Use the fishing rod to bring up the message and do not move."
+
+[blink_scene]
+eye_template = "bdsp/eyes/spear_pillar.png"  # ojo por defecto; se usa el que se marque en el paso «Escena»
+box = [0.4852, 0.4764, 0.0133, 0.0264]       # zona donde buscar el ojo: [x, y, ancho, alto] normalizados (0-1)
+zoom = false                                 # sin zoom de consola al observar
+message = true           # se observa con el mensaje de Serbal en pantalla: así el personaje no gira la cabeza
+min_blinks = 33          # parpadeos para identificar la semilla
+confirmation_blinks = 2  # parpadeos extra para confirmarla
+
+# Quién consume RNG mientras se observa: npc = personas del mapa, pokemon_npc = Pokémon que parpadean.
+[blink_scene.scene]
+npc = 0
+pokemon_npc = 0          # Regigigas aún no está cargado
+
+[approach]
+lead_s = 290.0                   # empieza 290 s antes del inicio: bajar (~47 s) + reidentificar (~1,5-2,5 min)
+                                 # + hablarle (~18 s) + ~40 s de margen
+after_reidentify_lead_s = 18.0   # lo que tardan los pasos de detrás de la reidentificación
+# Dónde ponerse para marcar el ojo de la reidentificación (se muestra en el paso «Escena»).
+reidentify_eye_instructions = "Sin guardar, baja y resuelve el puzle hasta Regigigas, ponte justo debajo de él mirando hacia la cámara (un toque de cruceta abajo) y usa la caña para que salga el mensaje del profesor Serbal."
+reidentify_eye_instructions_en = "Without saving, go down and solve the puzzle to reach Regigigas, stand right below it facing the camera (one tap of D-pad Down) and use the fishing rod to bring up Professor Rowan's message."
+# Avances que adelanta Regigigas el contador durante la ruta (medido: unos +108). Se aprende en cada intento.
+extra_advances = 115
+# Pasos (tipos en la clase MacroStep de games/bdsp/fast_advance.py): «hold» mantiene la cruceta «ms» ms y espera
+# «wait_ms»; «press» pulsa un botón. Recorrido del puzle de hielo, tramo a tramo:
+steps = [
+  { kind = "hold", button = "LEFT", ms = 1000, wait_ms = 4000 },    # bajar las escaleras
+  { kind = "hold", button = "LEFT", ms = 80, wait_ms = 2000 },
+  { kind = "hold", button = "LEFT", ms = 80, wait_ms = 2000 },
+  { kind = "hold", button = "LEFT", ms = 80, wait_ms = 1000 },
+  { kind = "hold", button = "DOWN", ms = 1000, wait_ms = 2000 },
+  { kind = "hold", button = "DOWN", ms = 80, wait_ms = 1000 },
+  { kind = "hold", button = "DOWN", ms = 80, wait_ms = 1000 },
+  { kind = "hold", button = "DOWN", ms = 80, wait_ms = 1000 },
+  { kind = "hold", button = "RIGHT", ms = 1000, wait_ms = 2000 },
+  { kind = "hold", button = "DOWN", ms = 1000, wait_ms = 2000 },
+  { kind = "hold", button = "DOWN", ms = 500, wait_ms = 2000 },
+  { kind = "hold", button = "RIGHT", ms = 1000, wait_ms = 2000 },
+  { kind = "hold", button = "UP", ms = 1000, wait_ms = 2000 },
+  { kind = "hold", button = "LEFT", ms = 1000, wait_ms = 2000 },
+  { kind = "hold", button = "DOWN", ms = 1000, wait_ms = 2000 },
+  { kind = "hold", button = "RIGHT", ms = 1000, wait_ms = 2000 },
+  { kind = "hold", button = "UP", ms = 1000, wait_ms = 500 },
+  { kind = "hold", button = "UP", ms = 500, wait_ms = 500 },        # justo debajo de Regigigas
+  { kind = "hold", button = "DOWN", ms = 60, wait_ms = 800 },       # girarse hacia la cámara (para ver el ojo)
+  # Reidentificar: con la caña sale el mensaje de Serbal y se observan «blinks» parpadeos con el ojo «eye»
+  # (marcado en el paso «Escena»). Después se re-planifica el mismo objetivo contando los parpadeos de Regigigas y
+  # los pasos siguientes empiezan «after_reidentify_lead_s» antes del inicio. «ms»: tiempo máximo.
+  { kind = "reidentify_pokemon", eye = "regigigas_delante", blinks = 12, ms = 300000 },
+  { kind = "press", button = "A", ms = 80, wait_ms = 800 },         # quitar el mensaje de Serbal
+  { kind = "hold", button = "UP", ms = 60, wait_ms = 800 },         # girarse hacia Regigigas
+  # Diálogo, sin leer el texto (vale en cualquier idioma). «dialog_next» espera un texto terminado con ▼ y pulsa A;
+  # «dialog_settle» espera un texto quieto sin ▼ y no pulsa. Así ninguna A se pierde ni se adelanta: con A a ciegas
+  # podía quedar «¡Gigaaas!» en pantalla y la A de inicio lanzaba el combate.
+  { kind = "press", button = "A", ms = 80, wait_ms = 300 },         # hablar con la estatua
+  { kind = "dialog_settle", ms = 6000 },                            # «Una energía indescriptible…» (sin ▼)
+  { kind = "press", button = "A", ms = 80, wait_ms = 300 },         # pasarlo
+  { kind = "dialog_next", ms = 8000 },                              # «Un cuerpo de roca» ▼
+  { kind = "dialog_next", ms = 8000 },                              # «Un cuerpo de hielo» ▼
+  { kind = "dialog_next", ms = 8000 },                              # «Un cuerpo de acero» ▼
+  { kind = "dialog_next", ms = 8000 },                              # «Cuando se reúnan los tres Pokémon…» ▼
+  { kind = "dialog_settle", ms = 6000 },                            # «…» (sin ▼): la siguiente A es el inicio
+]
+
+# Timeline: desde la pulsación de inicio, el RNG avanza así: «blank_reads» llamadas inmediatas, una pausa sin
+# consumo de «pause_s» s, «fixed_delay» llamadas fijas y después la escena de [timeline.scene].
+# Mismo modelo que Dialga y Uxie. La A de inicio cierra «…»: el cuadro desaparece ~1 s (Regigigas despierta) y
+# sale «¡Gigaaas!», que espera sin límite a la A final; esa A lanza el combate.
+[[timeline]]
+name = "diálogo con Regigigas"
+trigger = "A"          # pulsación que inicia el timeline
+blank_reads = 2
+pause_s = 2.0          # fogonazo blanco
+fixed_delay = 0        # llamadas fijas tras el fogonazo
+
+[timeline.scene]
+npc = 0
+pokemon_npc = 1        # Regigigas parpadea
+
+[final]
+trigger = "A"          # pulsación que genera el Pokémon
+final_delay = 88       # avances entre la pulsación final y la generación; delay inicial, se calibra solo
+min_timeline_s = 15.0  # tiempo mínimo entre inicio y pulsación final: hay que simular los parpadeos de Regigigas
+min_gap_margin_s = 0.12  # margen mínimo (s) a cada lado de la pulsación final
+
+# Acciones de avance rápido permitidas en la espera (ids de src/rngauto/games/bdsp/data/fast_advance.toml).
+[fast_advance]
+methods = ["pokedex_peek", "pokedex_scroll"]
+
+[verification]
+observe = ["shiny", "nature", "stats"]  # qué se lee de la ficha del Pokémon obtenido
+species = ["regigigas"]                 # especies posibles (estadísticas base con las que se interpreta la ficha)
+
+[recovery]
+method = "restart_game"  # para repetir el intento: reiniciar el juego y cargar la partida

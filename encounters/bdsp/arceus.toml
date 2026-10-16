@@ -1,0 +1,84 @@
+# Arceus — Sala del Origen. Juegos: Diamante Brillante y Perla Reluciente.
+#
+# Inicio: Columna Lanza, a un paso de la baldosa de la flauta, con el mensaje del profesor Serbal (caña). Arceus aún
+# no está cargado.
+# Ruta: pisar la baldosa → tocar la flauta (Sí) → cinemática (~42 s) → subir las escaleras (~36 s) → texto de
+# Arceus → A de inicio del timeline → A final → combate. Todo el recorrido dura unos 85 s.
+schema_version = 1
+
+[encounter]
+id = "arceus"            # identificador único; coincide con el nombre del fichero
+version = "1.0"          # versión de esta configuración (aparece en los registros de cada intento)
+game = "bdsp"
+strategy = "static"      # legendario estático: se genera al interactuar con él
+template = "arceus"      # plantilla de generación con la que se busca el objetivo
+games = ["BD", "SP"]     # versiones en que está: BD = Diamante Brillante, SP = Perla Reluciente
+display_name = "Arceus (Sala del Origen)"
+display_name_en = "Arceus (Hall of Origin)"
+status = "comprobado"    # «comprobado» (en consola real), «sin_probar» o «borrador»
+
+# Punto de partida. Textos para el usuario: clave en español y la misma con «_en» en inglés.
+[start]
+name = "Frente a la baldosa de la flauta (Columna Lanza)"
+name_en = "In front of the flute tile (Spear Pillar)"
+description = "Personaje a un paso de la baldosa. Las escaleras no existen."
+description_en = "Character one step from the tile. The stairs have not appeared yet."
+instructions = "Carga la partida a 1 paso de la baldosa. Usa la caña para que salga el mensaje de Serbal y no te muevas."
+instructions_en = "Load the save one step from the tile. Use the fishing rod to bring up Rowan's message and do not move."
+
+[blink_scene]
+eye_template = "bdsp/eyes/spear_pillar.png"  # ojo por defecto; se usa el que se marque en el paso «Escena»
+box = [0.4852, 0.4764, 0.0133, 0.0264]       # zona donde buscar el ojo: [x, y, ancho, alto] normalizados (0-1)
+zoom = false                                 # sin zoom de consola al observar
+message = true           # se observa con el mensaje de Serbal en pantalla: así el personaje no gira la cabeza
+min_blinks = 40          # parpadeos para identificar la semilla
+confirmation_blinks = 6  # parpadeos extra para confirmarla
+
+# Quién consume RNG mientras se observa: npc = personas del mapa, pokemon_npc = Pokémon que parpadean.
+[blink_scene.scene]
+npc = 0
+pokemon_npc = 0          # Arceus aún no está cargado
+
+[approach]
+lead_s = 100.0           # empieza 100 s antes del inicio del timeline (recorrido de ~85 s + margen)
+# Pasos (tipos en la clase MacroStep de games/bdsp/fast_advance.py): «hold» mantiene la cruceta «ms» ms y espera
+# «wait_ms»; «press» pulsa un botón; «dialog_settle» espera un texto quieto sin ▼ y no pulsa.
+steps = [
+  { kind = "hold", button = "UP", ms = 1000, wait_ms = 2500 },     # pisar la baldosa: empieza el diálogo
+  { kind = "press", button = "A", ms = 80, wait_ms = 2000 },       # pasar el texto: sale la caja Sí/No
+  { kind = "press", button = "A", ms = 80, wait_ms = 2000 },       # «Sí»
+  { kind = "press", button = "A", ms = 80, wait_ms = 42000 },      # «Empieza a sonar…» y cinemática (~42 s)
+  { kind = "press", button = "A", ms = 80, wait_ms = 2000 },       # cerrar «Han aparecido unas escaleras»
+  { kind = "hold", button = "UP", ms = 36000, wait_ms = 2000 },    # subir las escaleras hasta Arceus (~36 s)
+  { kind = "dialog_settle", ms = 2000 },                           # texto de Arceus: la siguiente A es el inicio
+]
+
+# Timeline: desde la pulsación de inicio, el RNG avanza así: «blank_reads» llamadas inmediatas, una pausa sin
+# consumo de «pause_s» s, «fixed_delay» llamadas fijas y después la escena de [timeline.scene].
+[[timeline]]
+name = "combate"
+trigger = "A"          # pulsación que inicia el timeline
+blank_reads = 0
+pause_s = 0.0
+fixed_delay = 0
+
+[timeline.scene]
+npc = 0
+pokemon_npc = 1        # Arceus parpadea
+
+[final]
+trigger = "A"          # pulsación que genera el Pokémon
+final_delay = 142      # avances entre la pulsación final y la generación; delay inicial, se calibra solo
+min_timeline_s = 1.0   # timeline muy corto: el inicio ya es dentro del diálogo
+min_gap_margin_s = 0.12  # margen mínimo (s) a cada lado de la pulsación final
+
+# Acciones de avance rápido permitidas en la espera (ids de src/rngauto/games/bdsp/data/fast_advance.toml).
+[fast_advance]
+methods = ["pokedex_peek", "pokedex_scroll"]
+
+[verification]
+observe = ["shiny", "nature", "stats"]  # qué se lee de la ficha del Pokémon obtenido
+species = ["arceus"]                    # especies posibles (estadísticas base con las que se interpreta la ficha)
+
+[recovery]
+method = "restart_game"  # para repetir el intento: reiniciar el juego y cargar la partida

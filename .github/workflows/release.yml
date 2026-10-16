@@ -1,0 +1,65 @@
+name: Release
+
+# Al subir una etiqueta vX.Y.Z (igual que __version__ de src/rngauto/__init__.py): tests, ejecutable de Windows,
+# autocomprobación del ejecutable y publicación en GitHub Releases con el zip y su suma SHA-256.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      ZIP: BlinkRNG-Automation-${{ github.ref_name }}-windows.zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,build]"
+
+      - name: La etiqueta coincide con la versión
+        shell: pwsh
+        run: |
+          $version = python -c "import rngauto; print(rngauto.__version__)"
+          if ("v$version" -ne "${{ github.ref_name }}") {
+            throw "La etiqueta ${{ github.ref_name }} no coincide con __version__ = $version"
+          }
+
+      - name: Tests (sin los lentos)
+        run: python -m pytest -m "not slow" -q
+
+      - name: Ejecutable
+        run: python -m PyInstaller packaging/rngauto.spec --noconfirm --distpath dist --workpath build
+
+      - name: Autocomprobación del ejecutable
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist/BlinkRNG-Automation/BlinkRNG-Automation.exe `
+                             -ArgumentList "--self-test" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "La autocomprobación del ejecutable ha fallado ($($p.ExitCode))" }
+
+      - name: Zip y suma SHA-256
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/BlinkRNG-Automation -DestinationPath $env:ZIP
+          $hash = (Get-FileHash $env:ZIP -Algorithm SHA256).Hash.ToLower()
+          "$hash  $env:ZIP" | Out-File -Encoding ascii "$env:ZIP.sha256"
+
+      - name: Publicar la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${{ github.ref_name }}" "$env:ZIP" "$env:ZIP.sha256"
+          --title "RNG Automation ${{ github.ref_name }}"
+          --notes-file packaging/release_notes.md
+          --generate-notes

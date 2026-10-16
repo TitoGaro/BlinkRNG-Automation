@@ -1,0 +1,38 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Tests and tooling caches
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Editors and OS
+.claude/
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Recordings and local data (the app keeps its data in %USERPROFILE%\.rngauto)
+grabaciones/
+recordings/
+*.avi
+*.mp4
+*.wav
+*.frames.jsonl
+
+# Temporary files and archives
+*.tmp
+*.bad
+*.bak
+*.zip
+*.7z

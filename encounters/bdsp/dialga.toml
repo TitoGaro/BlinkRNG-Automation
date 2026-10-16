@@ -1,0 +1,69 @@
+# Dialga — Columna Lanza. Juego: Diamante Brillante.
+#
+# Inicio: delante de Dialga, con la partida guardada ahí.
+# Ruta: sin pasos previos; A de inicio (hablarle) → fogonazo (2 s) → A final → combate.
+# Configuración provisional: la caja del ojo y la acción de inicio están por validar con grabaciones.
+schema_version = 1
+
+[encounter]
+id = "dialga"            # identificador único; coincide con el nombre del fichero
+version = "0.1"          # versión de esta configuración (aparece en los registros de cada intento)
+status = "sin_probar"    # «comprobado» (en consola real), «sin_probar» o «borrador»
+game = "bdsp"
+strategy = "static"      # legendario estático: se genera al interactuar con él
+template = "dialga"      # plantilla de generación con la que se busca el objetivo
+games = ["BD"]           # versiones en que está: BD = Diamante Brillante, SP = Perla Reluciente
+display_name = "Dialga (Columnas Lanza)"
+display_name_en = "Dialga (Spear Pillar)"
+
+# Punto de partida. Textos para el usuario: clave en español y la misma con «_en» en inglés.
+[start]
+name = "Columna Lanza, frente a Dialga"
+name_en = "Spear Pillar, facing Dialga"
+description = "Personaje de pie ante Dialga, con la partida guardada en este punto."
+description_en = "Character standing in front of Dialga, with the game saved at this point."
+instructions = "Carga la partida guardada frente a Dialga y no te muevas."
+instructions_en = "Load the save made in front of Dialga and do not move."
+
+[blink_scene]
+eye_template = "bdsp/eyes/spear_pillar.png"  # ojo por defecto; se usa el que se marque en el paso «Escena»
+box = [0.4852, 0.4764, 0.0133, 0.0264]       # zona del ojo, [x, y, ancho, alto] normalizados (621, 343, 17, 19
+                                             # px sobre 1280x720)
+zoom = false                                 # sin zoom de consola al observar
+min_blinks = 40          # parpadeos para identificar la semilla
+confirmation_blinks = 6  # parpadeos extra para confirmarla
+
+# Quién consume RNG mientras se observa: npc = personas del mapa, pokemon_npc = Pokémon que parpadean.
+[blink_scene.scene]
+npc = 0
+pokemon_npc = 0
+
+# Timeline: desde la pulsación de inicio, el RNG avanza así: «blank_reads» llamadas inmediatas, una pausa sin
+# consumo de «pause_s» s, «fixed_delay» llamadas fijas y después la escena de [timeline.scene].
+[[timeline]]
+name = "entrada"
+trigger = "A"        # pulsación que inicia el timeline
+blank_reads = 2      # lectura en blanco al pulsar + 1 al cerrar el menú
+pause_s = 2.0        # fogonazo blanco
+fixed_delay = 0
+
+[timeline.scene]
+npc = 0
+pokemon_npc = 1      # Dialga parpadea
+
+[final]
+trigger = "A"        # pulsación que genera el Pokémon
+final_delay = 84     # avances entre la pulsación final y la generación; delay inicial, se calibra solo
+min_timeline_s = 30.0  # tiempo mínimo entre el inicio del timeline y la pulsación final
+min_gap_margin_s = 0.12  # margen mínimo (s) a cada lado de la pulsación final
+
+# Acciones de avance rápido permitidas en la espera (ids de src/rngauto/games/bdsp/data/fast_advance.toml).
+# En esta escena se puede abrir el menú.
+[fast_advance]
+methods = ["pokedex_peek", "pokedex_scroll"]
+
+[verification]
+observe = ["shiny", "nature", "stats"]  # qué se lee de la ficha del Pokémon obtenido
+
+[recovery]
+method = "restart_game"  # para repetir el intento: reiniciar el juego y cargar la partida

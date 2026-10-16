@@ -1,0 +1,82 @@
+# Azelf — Lago Valor (Caverna Valor). Juegos: Diamante Brillante y Perla Reluciente.
+#
+# Inicio: fuera de la Caverna Valor, delante de la entrada y mirando hacia la cámara, con el mensaje del profesor
+# Serbal (caña). Dentro de la cueva Azelf ya está cargado; fuera la semilla sale limpia (como Uxie).
+# Ruta: girarse → entrar en la cueva → caminar hasta Azelf (se para al chocar con él) → A de inicio (hablarle) →
+# grito y fogonazo (2 s) → A final en su texto → combate. Ruta pendiente de comprobar (número de pasos).
+# Azelf parpadea durante el timeline. Si el delay saliera disperso, habría que reidentificar delante de él
+# (paso «reidentify_pokemon», como en regigigas.toml).
+schema_version = 1
+
+[encounter]
+id = "azelf"             # identificador único; coincide con el nombre del fichero
+version = "0.1"          # versión de esta configuración (aparece en los registros de cada intento)
+game = "bdsp"
+strategy = "static"      # legendario estático: se genera al interactuar con él
+template = "azelf"       # plantilla de generación con la que se busca el objetivo
+games = ["BD", "SP"]     # versiones en que está: BD = Diamante Brillante, SP = Perla Reluciente
+display_name = "Azelf (Lago Valor)"
+display_name_en = "Azelf (Lake Valor)"
+status = "sin_probar"    # «comprobado» (en consola real), «sin_probar» o «borrador»
+
+# Punto de partida. Textos para el usuario: clave en español y la misma con «_en» en inglés.
+[start]
+name = "Fuera de la Caverna Valor (Lago Valor)"
+name_en = "Outside Valor Cavern (Lake Valor)"
+description = "Justo delante de la entrada de la cueva, mirando hacia la cámara, con la partida guardada ahí."
+description_en = "Right in front of the cave entrance, facing the camera, with the game saved there."
+instructions = "Carga la partida, usa la caña (sale el mensaje del profesor Serbal) y no te muevas."
+instructions_en = "Load the save, use the fishing rod (Professor Rowan's message appears) and do not move."
+
+[blink_scene]
+eye_template = "bdsp/eyes/lake_outside.png"  # ojo por defecto; se usa el que se marque en el paso «Escena»
+box = [0.47, 0.44, 0.03, 0.05]               # zona donde buscar el ojo: [x, y, ancho, alto] normalizados (0-1)
+message = true           # se observa con el mensaje de Serbal en pantalla: así el personaje no gira la cabeza
+min_blinks = 33          # parpadeos para identificar la semilla
+confirmation_blinks = 2  # parpadeos extra para confirmarla
+
+# Quién consume RNG mientras se observa: npc = personas del mapa, pokemon_npc = Pokémon que parpadean.
+[blink_scene.scene]
+npc = 0
+pokemon_npc = 0          # Azelf aún no está cargado
+
+[approach]
+lead_s = 14.0            # empieza 14 s antes del inicio del timeline
+# Pasos (tipos en la clase MacroStep de games/bdsp/fast_advance.py): «hold» mantiene la cruceta «ms» ms y espera
+# «wait_ms».
+steps = [
+  { kind = "hold", button = "UP", ms = 90, wait_ms = 600 },     # girarse hacia la cueva
+  { kind = "hold", button = "UP", ms = 400, wait_ms = 2800 },   # entrar por la puerta (+ transición)
+  { kind = "hold", button = "UP", ms = 3500, wait_ms = 300 },   # caminar hasta Azelf
+]
+
+# Timeline: desde la pulsación de inicio, el RNG avanza así: «blank_reads» llamadas inmediatas, una pausa sin
+# consumo de «pause_s» s, «fixed_delay» llamadas fijas y después la escena de [timeline.scene].
+# A de inicio: hablarle; grito y fogonazo (2 s); la A final, en su texto, inicia el combate.
+[[timeline]]
+name = "diálogo con Azelf"
+trigger = "A"          # pulsación que inicia el timeline
+blank_reads = 2
+pause_s = 2.0          # fogonazo blanco
+fixed_delay = 0        # llamadas fijas tras el fogonazo
+
+[timeline.scene]
+npc = 0
+pokemon_npc = 1        # Azelf parpadea
+
+[final]
+trigger = "A"          # pulsación que genera el Pokémon
+final_delay = 85       # avances entre la pulsación final y la generación; delay inicial, se calibra solo
+min_timeline_s = 15.0  # tiempo mínimo entre el inicio del timeline y la pulsación final
+min_gap_margin_s = 0.12  # margen mínimo (s) a cada lado de la pulsación final
+
+# Acciones de avance rápido permitidas en la espera (ids de src/rngauto/games/bdsp/data/fast_advance.toml).
+[fast_advance]
+methods = ["pokedex_peek", "pokedex_scroll"]
+
+[verification]
+observe = ["shiny", "nature", "stats"]  # qué se lee de la ficha del Pokémon obtenido
+species = ["azelf"]                     # especies posibles (estadísticas base con las que se interpreta la ficha)
+
+[recovery]
+method = "restart_game"  # para repetir el intento: reiniciar el juego y cargar la partida

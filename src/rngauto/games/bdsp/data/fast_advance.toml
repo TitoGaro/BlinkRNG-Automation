@@ -1,0 +1,69 @@
+# Acciones de avance rápido del RNG en BDSP (datos, no código).
+#
+# La Pokédex es la forma más rápida de avanzar el RNG: cada Pokémon que se muestra carga su modelo y consume
+# llamadas, así que recorrer la lista arriba y abajo avanza mucho. Las cifras «prior_*» son solo el punto de
+# partida: el programa mide cada vez cuántos avances ha consumido (reidentificando con parpadeos) y usa lo
+# medido.
+#
+# Llegar a la Pokédex esté donde esté el cursor: X abre el menú; «+» abre el mapa
+# («Ver mapa»); al salir del mapa con B el cursor queda sobre «Mapa», que en la cuadrícula del menú está
+# justo debajo de «Pokédex»; ARRIBA y A. Fila 1: Pokédex, Pokémon, Mochila, Ficha; fila 2: Mapa, Cápsulas,
+# Opciones, Regalo misterioso.
+#
+# Seguridad: los pasos «check» comprueban en la imagen la pantalla esperada antes de seguir (esperando como
+# mucho «ms»). El menú se reconoce siempre (detector integrado); la Pokédex se aprende la primera vez, con
+# confirmación del usuario. La comprobación del menú tras salir del mapa es crítica: si el juego hubiera
+# vuelto al mundo abierto, ARRIBA movería al personaje.
+#
+# Pasos: kind = "press" (button, ms, wait_ms) | "hold" (button = UP/DOWN/LEFT/RIGHT, ms, wait_ms, scalable)
+#        | "check" (screen, ms = espera máxima). Los «hold» con scalable = true duran lo que decida el
+#        programa (entre min_hold_s y max_hold_s en total) según los avances que falten.
+
+[[method]]
+id = "pokedex_peek"
+name = "Entrar y salir de la Pokédex"
+name_en = "Open and close the Pokédex"
+description = "Abre el menú, va a la Pokédex, entra y sale. Avance pequeño (~150): para ajustar los últimos cientos."
+description_en = "Opens the menu, goes to the Pokédex, opens it and closes it. Small advance (~150): for fine-tuning the last few hundred."
+prior_mean = 150
+prior_sd = 80
+steps = [
+  { kind = "press", button = "X", wait_ms = 1000 },
+  { kind = "check", screen = "menu", ms = 4000 },
+  { kind = "press", button = "PLUS", wait_ms = 2500 },       # mapa
+  { kind = "press", button = "B", wait_ms = 1200 },          # de vuelta al menú, cursor en «Mapa»
+  { kind = "check", screen = "menu", ms = 5000 },            # imprescindible antes de usar la cruceta
+  { kind = "hold", button = "UP", ms = 100, wait_ms = 500 },  # cursor a «Pokédex»
+  { kind = "press", button = "A", wait_ms = 2000 },
+  { kind = "check", screen = "pokedex", ms = 6000 },
+  { kind = "press", button = "B", wait_ms = 2200 },
+  { kind = "press", button = "B", wait_ms = 1500 },
+]
+
+[[method]]
+id = "pokedex_scroll"
+name = "Recorrer la Pokédex arriba y abajo"
+name_en = "Scroll the Pokédex down and up"
+description = "Recorre la lista de la Pokédex hacia abajo y hacia arriba (cada Pokémon carga su modelo). Avance grande (~5000 la lista entera); el programa ajusta cuánto tiempo recorre según lo que falte."
+description_en = "Scrolls the Pokédex list down and back up (each Pokémon loads its model). Large advance (~5000 for the whole list); the program adjusts how long it scrolls based on how many advances are left."
+prior_mean = 15500      # con la duración por defecto (20 s + 22 s)
+prior_sd = 5000
+prior_rate = 370        # avances por segundo de recorrido; medido en consola: 5571 con 14,9 s; se aprende
+min_hold_s = 2
+max_hold_s = 50         # medido: la lista baja ~20 fichas/s; la Nacional (493) entera son ~25 s por sentido
+prior_ramp_s = 1.0      # la lista tarda en coger velocidad al empezar a bajar y al empezar a subir (se aprende)
+base_from = "pokedex_peek"  # abrir y cerrar la Pokédex es lo mismo que «entrar y salir»
+steps = [
+  { kind = "press", button = "X", wait_ms = 1000 },
+  { kind = "check", screen = "menu", ms = 4000 },
+  { kind = "press", button = "PLUS", wait_ms = 2500 },
+  { kind = "press", button = "B", wait_ms = 1200 },
+  { kind = "check", screen = "menu", ms = 5000 },
+  { kind = "hold", button = "UP", ms = 100, wait_ms = 500 },
+  { kind = "press", button = "A", wait_ms = 2000 },
+  { kind = "check", screen = "pokedex", ms = 6000 },
+  { kind = "hold", button = "DOWN", ms = 20000, wait_ms = 500, scalable = true },
+  { kind = "hold", button = "UP", ms = 22000, wait_ms = 1500, scalable = true },   # algo más: vuelve siempre arriba
+  { kind = "press", button = "B", wait_ms = 2000 },          # Pokédex → menú
+  { kind = "press", button = "B", wait_ms = 1500 },          # menú → sala
+]

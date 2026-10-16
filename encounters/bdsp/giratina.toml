@@ -1,0 +1,80 @@
+# Giratina — Cueva Retorno. Juegos: Diamante Brillante y Perla Reluciente.
+#
+# Inicio: justo debajo de Giratina, mirando hacia la cámara, con el mensaje del profesor Serbal (caña). La semilla
+# se saca delante de él, sin reidentificar.
+# Ruta: girarse hacia Giratina → A de inicio (hablarle) → fogonazo (2 s) → A final en «¡Gishaaan!» → combate.
+# Ruta pendiente de comprobar en consola.
+# A diferencia de los demás estáticos, tras el fogonazo hay 2 llamadas fijas; Giratina parpadea durante el
+# timeline.
+schema_version = 1
+
+[encounter]
+id = "giratina"          # identificador único; coincide con el nombre del fichero
+version = "0.1"          # versión de esta configuración (aparece en los registros de cada intento)
+game = "bdsp"
+strategy = "static"      # legendario estático: se genera al interactuar con él
+template = "giratina"    # plantilla de generación con la que se busca el objetivo
+games = ["BD", "SP"]     # versiones en que está: BD = Diamante Brillante, SP = Perla Reluciente
+display_name = "Giratina (Cueva Retorno)"
+display_name_en = "Giratina (Turnback Cave)"
+status = "sin_probar"    # «comprobado» (en consola real), «sin_probar» o «borrador»
+
+# Punto de partida. Textos para el usuario: clave en español y la misma con «_en» en inglés.
+[start]
+name = "Cueva Retorno, delante de Giratina"
+name_en = "Turnback Cave, in front of Giratina"
+description = "Justo debajo de Giratina, mirando hacia la cámara (para que se vea el ojo), con la partida guardada ahí."
+description_en = "Right below Giratina, facing the camera (so the eye is visible), with the game saved there."
+instructions = "Carga la partida, usa la caña (sale el mensaje del profesor Serbal) y no te muevas."
+instructions_en = "Load the save, use the fishing rod (Professor Rowan's message appears) and do not move."
+
+[blink_scene]
+eye_template = "bdsp/eyes/spear_pillar.png"  # ojo por defecto; se usa el que se marque en el paso «Escena»
+box = [0.4852, 0.4764, 0.0133, 0.0264]       # zona donde buscar el ojo: [x, y, ancho, alto] normalizados (0-1)
+message = true           # se observa con el mensaje de Serbal en pantalla: así el personaje no gira la cabeza
+min_blinks = 33          # parpadeos para identificar la semilla
+confirmation_blinks = 2  # parpadeos extra para confirmarla
+
+# Quién consume RNG mientras se observa: npc = personas del mapa, pokemon_npc = Pokémon que parpadean.
+[blink_scene.scene]
+npc = 0
+pokemon_npc = 0
+
+[approach]
+lead_s = 6.0             # empieza 6 s antes del inicio del timeline
+# Pasos (tipos en la clase MacroStep de games/bdsp/fast_advance.py): «hold» mantiene la cruceta «ms» ms y espera
+# «wait_ms».
+steps = [
+  { kind = "hold", button = "UP", ms = 90, wait_ms = 800 },     # girarse hacia Giratina
+]
+
+# Timeline: desde la pulsación de inicio, el RNG avanza así: «blank_reads» llamadas inmediatas, una pausa sin
+# consumo de «pause_s» s, «fixed_delay» llamadas fijas y después la escena de [timeline.scene].
+# A de inicio: hablarle (fogonazo de 2 s); la A final, en «¡Gishaaan!», inicia el combate.
+[[timeline]]
+name = "diálogo con Giratina"
+trigger = "A"          # pulsación que inicia el timeline
+blank_reads = 2
+pause_s = 2.0          # fogonazo blanco
+fixed_delay = 2        # llamadas fijas tras el fogonazo
+
+[timeline.scene]
+npc = 0
+pokemon_npc = 1        # Giratina parpadea
+
+[final]
+trigger = "A"          # pulsación que genera el Pokémon
+final_delay = 84       # avances entre la pulsación final y la generación; delay inicial, se calibra solo
+min_timeline_s = 15.0  # tiempo mínimo entre el inicio del timeline y la pulsación final
+min_gap_margin_s = 0.12  # margen mínimo (s) a cada lado de la pulsación final
+
+# Acciones de avance rápido permitidas en la espera (ids de src/rngauto/games/bdsp/data/fast_advance.toml).
+[fast_advance]
+methods = ["pokedex_peek", "pokedex_scroll"]
+
+[verification]
+observe = ["shiny", "nature", "stats"]  # qué se lee de la ficha del Pokémon obtenido
+species = ["giratina"]                  # especies posibles (estadísticas base con las que se interpreta la ficha)
+
+[recovery]
+method = "restart_game"  # para repetir el intento: reiniciar el juego y cargar la partida
