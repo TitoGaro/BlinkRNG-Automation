@@ -2,6 +2,8 @@
 
 Hecho por **TitoGaro** · [English](README.en.md)
 
+[![Invítame a un café](https://img.shields.io/badge/Inv%C3%ADtame%20a%20un%20caf%C3%A9-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/titogaro)
+
 Aplicación de escritorio para Windows que hace de principio a fin el RNG por parpadeos de los legendarios
 estáticos de *Pokémon Diamante Brillante* y *Perla Reluciente*. Ve el juego por una capturadora y pulsa los
 botones con un ESP32 que hace de mando.
@@ -139,6 +141,11 @@ Cada encuentro es un fichero TOML en `encounters/bdsp/`. Copia uno parecido (por
 `hansa_regice.toml`) y cambia la plantilla de generación, la escena de parpadeos, la ruta hasta el Pokémon y
 el delay inicial. El motor no cambia. [`docs/01-arquitectura.md`](docs/01-arquitectura.md) explica cómo
 encajan las piezas.
+
+## Apoya el proyecto
+
+RNG Automation es gratis y lo seguirá siendo. Si te ha servido y quieres apoyar su desarrollo, puedes
+[invitarme a un café](https://buymeacoffee.com/titogaro). ¡Gracias!
 
 ## Agradecimientos
 

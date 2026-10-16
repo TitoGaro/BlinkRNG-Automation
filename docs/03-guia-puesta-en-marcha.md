@@ -83,7 +83,8 @@ Windows. No se puede cambiar mientras hay una ejecución en marcha.
 - **Ficha:** pasa los textos (si alguien quiere aprender un movimiento, elige «Conservar»), abre la ficha
   del capturado y lee la naturaleza y las estadísticas, sin depender del idioma del juego. Las cifras las
   lee con el OCR de Windows. La naturaleza la saca de los colores: rojo para la que sube y azul para la que
-  baja; si no hay colores, es neutra y la lee en «Notas del Entrenador». Con eso deduce las IVs y qué
+  baja; si no hay colores, es neutra y lee cuál en «Notas del Entrenador» (en cualquier idioma del juego; si no
+  la reconoce, sigue con «una de las 5 neutras»). Con eso deduce las IVs y qué
   advance obtuviste.
 - **Calibración y reinicio:** ajusta el *delay* con lo obtenido, cierra el juego desde HOME (sin guardar),
   lo vuelve a abrir y repite. Si no puede leer la ficha, te pide los datos en una ventana.

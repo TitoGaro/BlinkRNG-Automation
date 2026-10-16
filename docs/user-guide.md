@@ -87,7 +87,8 @@ your Windows language. It cannot be changed while a run is in progress.
   current moves), opens the Summary of the caught Pokémon and reads its nature and stats, regardless of the
   game language. It reads the numbers with Windows OCR. It gets the nature from the colours: red for the stat
   that goes up and blue for the one that goes down; if there are no colours, the nature is neutral and it
-  reads it on the Trainer Memo page. From that it works out the IVs and which advance you got.
+  reads which one on the Trainer Memo page (in any game language; if it cannot tell, it carries on with "one of
+  the 5 neutral natures"). From that it works out the IVs and which advance you got.
 - **Calibration and restart:** it adjusts the *delay* with the result, closes the game from HOME (without
   saving), opens it again and repeats. If it cannot read the Summary, it asks you for the data in a window.
 - **Stop** (red button at the top, or the **F12** key): immediately stops whatever is running, closes any

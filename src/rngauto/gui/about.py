@@ -18,6 +18,7 @@ POKEFINDER_URL = "https://github.com/Admiral-Fish/PokeFinder"
 PROJECT_XS_URL = "https://github.com/niart120/Project_Xs"
 PROJECT_XS_FORK_URL = "https://github.com/Lincoln-LM/Project_Xs"
 PAPAJEFE_URL = "https://www.youtube.com/@PapaJefeYT"
+SUPPORT_URL = "https://buymeacoffee.com/titogaro"  # donaciones voluntarias al autor
 
 
 def _link(url: str, text: str) -> str:
@@ -49,6 +50,10 @@ def credits_html() -> str:
         f"<p style='font-size:13pt; font-weight:600; margin:0;'>RNG Automation {__version__}</p>"
         f"<p style='color:{theme.MUTED}; margin-top:2px;'>"
         + t("Hecho por <b>{author}</b>", "Made by <b>{author}</b>", author=__author__) + "</p>"
+        "<p style='margin-top:8px;'>"
+        + t("¿Te ha servido? {link}", "Has it helped you? {link}",
+            link=_link(SUPPORT_URL, t("Invítame a un café", "Buy me a coffee")))
+        + "</p>"
         f"<p style='margin-top:14px;'><b>{t('Agradecimientos', 'Acknowledgements')}</b></p>"
         f"<ul style='margin-left:-18px;'>{rows}</ul>"
         f"<p style='color:{theme.MUTED};'>"

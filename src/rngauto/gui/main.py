@@ -9,8 +9,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QIcon, QKeySequence, QPixmap, QShortcut
+from PySide6.QtCore import QSize, Qt, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
     QPushButton, QSlider, QStackedWidget, QVBoxLayout, QWidget,
@@ -21,7 +21,7 @@ from rngauto.games.bdsp.static_strategy import Mode
 from rngauto.i18n import t
 
 from . import theme
-from .about import AboutDialog
+from .about import SUPPORT_URL, AboutDialog
 from .game_window import GameWindow
 from .icons import icon
 from .pages.base import Page
@@ -168,16 +168,26 @@ class MainWindow(QMainWindow):
         self.language.setCurrentIndex(max(0, self.language.findData(i18n.language())))
         self.language.setToolTip(t("Idioma de la aplicación", "Application language"))
         self.language.currentIndexChanged.connect(self._language_changed)
-        about = QPushButton(t("Créditos", "Credits"))
+        # Iconos sin texto (con descripción al pasar el ratón): así cabe el selector de idioma.
+        about = QPushButton()
         about.setObjectName("ghost")
         about.setIcon(icon("info", theme.MUTED))
         about.setCursor(Qt.CursorShape.PointingHandCursor)
-        about.setToolTip(t("Versión {version}: autor, agradecimientos y licencia",
-                           "Version {version}: author, acknowledgements and license", version=__version__))
+        about.setToolTip(t("Créditos · versión {version}: autor, agradecimientos y licencia",
+                           "Credits · version {version}: author, acknowledgements and license", version=__version__))
+        about.setAccessibleName(t("Créditos", "Credits"))
         about.clicked.connect(lambda: AboutDialog(self).exec())
+        coffee = QPushButton()
+        coffee.setObjectName("ghost")
+        coffee.setIcon(icon("coffee", theme.GOLD))
+        coffee.setCursor(Qt.CursorShape.PointingHandCursor)
+        coffee.setToolTip(t("Invítame a un café (abre el navegador)", "Buy me a coffee (opens the browser)"))
+        coffee.setAccessibleName(t("Invítame a un café", "Buy me a coffee"))
+        coffee.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(SUPPORT_URL)))
         fl.addWidget(globe)
         fl.addWidget(self.language, 1)
         fl.addWidget(about)
+        fl.addWidget(coffee)
         lay.addWidget(foot)
         return side
 

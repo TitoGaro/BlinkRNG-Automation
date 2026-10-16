@@ -2,6 +2,8 @@
 
 By **TitoGaro** · [Español](README.md)
 
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/titogaro)
+
 A Windows desktop app that does blink RNG manipulation of static legendary encounters in *Pokémon Brilliant
 Diamond* and *Shining Pearl* from start to finish. It reads the game through a capture card and presses
 the buttons with an ESP32 that acts as a controller.
@@ -137,6 +139,11 @@ Each encounter is a TOML file in `encounters/bdsp/`. Copy a similar one (for exa
 and change the generation template, the blink scene, the route to the Pokémon and the initial delay. The
 engine does not need to change. [`docs/01-arquitectura.md`](docs/01-arquitectura.md) (in Spanish) explains
 how the parts fit together.
+
+## Support the project
+
+RNG Automation is free and will stay free. If it has helped you and you want to support its development,
+you can [buy me a coffee](https://buymeacoffee.com/titogaro). Thank you!
 
 ## Acknowledgements
 
